@@ -10,7 +10,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 OR MIT
 
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.16)
 
 project(iceoryx2-cxx-tests VERSION ${IOX2_VERSION} LANGUAGES CXX)
 
