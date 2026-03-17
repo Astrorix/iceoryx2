@@ -10,6 +10,18 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 version = { workspace = true }
 
+[features]
+default = ["std"]
+
+std = [
+  "iceoryx2-bb-posix/std",
+  "iceoryx2-bb-testing/std",  
+  "iceoryx2-services-discovery/std",
+  "iceoryx2-tunnel-backend/std",  
+  "iceoryx2-tunnel/std",  
+  "iceoryx2/std",
+]
+
 [dependencies]
 iceoryx2-bb-conformance-test-macros = { workspace = true }
 iceoryx2 = { workspace = true }

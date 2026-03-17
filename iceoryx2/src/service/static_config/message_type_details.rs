@@ -16,7 +16,7 @@ use iceoryx2_bb_container::string::*;
 use iceoryx2_bb_derive_macros::ZeroCopySend;
 use iceoryx2_bb_elementary::math::align;
 use iceoryx2_bb_elementary_traits::zero_copy_send::ZeroCopySend;
-use iceoryx2_bb_log::fatal_panic;
+use iceoryx2_log::fatal_panic;
 use serde::{Deserialize, Serialize};
 
 use crate::constants::MAX_TYPE_NAME_LENGTH;
@@ -54,7 +54,9 @@ pub enum TypeVariant {
 pub type TypeName = StaticString<MAX_TYPE_NAME_LENGTH>;
 
 /// Contains all type details required to connect to a [`crate::service::Service`]
-#[derive(Default, Debug, Clone, Eq, Hash, PartialEq, ZeroCopySend, Serialize, Deserialize)]
+#[derive(
+    Default, Debug, Clone, Copy, Eq, Hash, PartialEq, ZeroCopySend, Serialize, Deserialize,
+)]
 #[repr(C)]
 pub struct TypeDetail {
     pub(crate) variant: TypeVariant,
@@ -104,7 +106,9 @@ impl TypeDetail {
 }
 
 /// Contains all type information to the header and payload type.
-#[derive(Default, Debug, Clone, Eq, Hash, PartialEq, ZeroCopySend, Serialize, Deserialize)]
+#[derive(
+    Default, Debug, Clone, Copy, Eq, Hash, PartialEq, ZeroCopySend, Serialize, Deserialize,
+)]
 #[repr(C)]
 pub struct MessageTypeDetails {
     /// The [`TypeDetail`] of the header of a message, the first iceoryx2 internal part.

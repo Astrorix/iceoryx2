@@ -10,6 +10,17 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+// Need to use target instead of `std` flag to support commands that build
+// crates in isolation, such as:
+//   cargo build --workspace --all-targets
+//
+// While depending purely on the `std` feature flag here would be more
+// consistent, such commands seem to only build with default features,
+// and crates do not have `std` enabled by default to simplify `no_std` builds.
+#![cfg_attr(
+    any(target_os = "linux", target_os = "nto", target_os = "none"),
+    no_std
+)]
 #![allow(clippy::missing_safety_doc)]
 #![warn(clippy::alloc_instead_of_core)]
 #![warn(clippy::std_instead_of_alloc)]
@@ -19,30 +30,55 @@ extern crate alloc;
 
 mod common;
 
-#[cfg(all(target_os = "linux", feature = "libc_platform"))]
-#[path = "libc/mod.rs"]
-mod platform;
+#[cfg(platform_override)]
+mod os {
+    #![allow(non_upper_case_globals)]
+    #![allow(non_camel_case_types)]
+    #![allow(non_snake_case)]
+    #![allow(unused)]
+    #![allow(improper_ctypes)]
+    #![allow(unknown_lints)]
+    #![allow(unnecessary_transmutes)]
+    #![allow(clippy::all)]
+    include!(concat!(env!("IOX2_CUSTOM_POSIX_PLATFORM_PATH"), "/os.rs"));
+}
 
+#[cfg(not(platform_override))]
 #[cfg(target_os = "android")]
-#[path = "android/mod.rs"]
-pub mod platform;
-#[cfg(target_os = "freebsd")]
-#[path = "freebsd/mod.rs"]
-mod platform;
-#[cfg(target_os = "macos")]
-#[path = "macos/mod.rs"]
-mod platform;
-#[cfg(all(target_os = "linux", not(feature = "libc_platform")))]
-#[path = "linux/mod.rs"]
-pub mod platform;
-#[cfg(target_os = "nto")]
-#[path = "qnx/mod.rs"]
-mod platform;
-#[cfg(target_os = "windows")]
-#[path = "windows/mod.rs"]
-mod platform;
+#[path = "android/os.rs"]
+mod os;
 
-#[cfg(not(feature = "libc_platform"))]
+#[cfg(not(platform_override))]
+#[cfg(target_os = "freebsd")]
+#[path = "freebsd/os.rs"]
+mod os;
+
+#[cfg(not(platform_override))]
+#[cfg(target_os = "macos")]
+#[path = "macos/os.rs"]
+mod os;
+
+#[cfg(not(platform_override))]
+#[cfg(target_os = "linux")]
+#[path = "linux/os.rs"]
+pub mod os;
+
+#[cfg(not(platform_override))]
+#[cfg(target_os = "nto")]
+#[path = "qnx/os.rs"]
+mod os;
+
+#[cfg(not(platform_override))]
+#[cfg(target_os = "windows")]
+#[path = "windows/os.rs"]
+mod os;
+
+#[cfg(not(platform_override))]
+#[cfg(target_os = "none")]
+#[path = "stub/os.rs"]
+mod os;
+
+#[cfg(platform_binding = "bindgen")]
 pub(crate) mod internal {
     #![allow(non_upper_case_globals)]
     #![allow(non_camel_case_types)]
@@ -52,16 +88,16 @@ pub(crate) mod internal {
     #![allow(unknown_lints)]
     #![allow(unnecessary_transmutes)]
     #![allow(clippy::all)]
-    include!(concat!(
-        env!("OUT_DIR"),
-        env!("BAZEL_BINDGEN_PATH_CORRECTION"),
-        "/posix_generated.rs"
-    ));
+    #[cfg(not(bazel_build))]
+    include!(concat!(env!("OUT_DIR"), "/posix_generated.rs"));
+
+    #[cfg(bazel_build)]
+    pub use iceoryx2_pal_posix_bindgen::*;
 
     pub const ESUCCES: u32 = 0;
 }
 
-#[cfg(feature = "libc_platform")]
+#[cfg(platform_binding = "libc")]
 pub(crate) mod internal {
     pub use libc::*;
 }
@@ -77,5 +113,5 @@ pub mod posix {
     #[allow(unused_imports)]
     pub(crate) use common::string_operations::*;
 
-    pub use crate::platform::*;
+    pub use crate::os::posix::*;
 }

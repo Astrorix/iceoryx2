@@ -12,14 +12,12 @@
 
 cmake_minimum_required(VERSION 3.16)
 
-set(ICEORYX_HOOFS_VERSION 2.95.8)
-set(IOX2_VERSION 0.7.0)
+set(IOX2_VERSION 0.8.999)
 project(iceoryx2-cxx VERSION ${IOX2_VERSION} LANGUAGES CXX)
 
 set(PREFIX iceoryx2/v${CMAKE_PROJECT_VERSION})
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(iceoryx_hoofs ${ICEORYX_HOOFS_VERSION} REQUIRED)
 find_package(iceoryx2-c REQUIRED)
 find_package(iceoryx2-bb-cxx REQUIRED)
 
@@ -85,6 +83,7 @@ add_library(iceoryx2-cxx-object-lib OBJECT
     src/static_config_publish_subscribe.cpp
     src/static_config_request_response.cpp
     src/subscriber_details.cpp
+    src/type_variant.cpp
     src/unique_port_id.cpp
     src/waitset.cpp
     src/writer_details.cpp
@@ -107,8 +106,7 @@ set_target_properties(iceoryx2-cxx-object-lib
 
 target_link_libraries(iceoryx2-cxx-object-lib
     PUBLIC
-    iceoryx2-bb-cxx::iceoryx2-bb-containers-cxx
-    iceoryx_hoofs::iceoryx_hoofs
+    iceoryx2-bb-cxx::iceoryx2-bb-cxx
     iceoryx2-c::includes-only
     iceoryx2-cxx::includes-only-cxx
     ${ICEORYX2_SANITIZER_FLAGS}
@@ -129,8 +127,7 @@ set_target_properties(static-lib-cxx
 
 target_link_libraries(static-lib-cxx
     PUBLIC
-    iceoryx2-bb-cxx::iceoryx2-bb-containers-cxx
-    iceoryx_hoofs::iceoryx_hoofs
+    iceoryx2-bb-cxx::iceoryx2-bb-cxx
     iceoryx2-c::static-lib
     iceoryx2-cxx::includes-only-cxx
 )
@@ -149,8 +146,7 @@ set_target_properties(shared-lib-cxx
 
 target_link_libraries(shared-lib-cxx
     PUBLIC
-    iceoryx2-bb-cxx::iceoryx2-bb-containers-cxx
-    iceoryx_hoofs::iceoryx_hoofs
+    iceoryx2-bb-cxx::iceoryx2-bb-cxx
     iceoryx2-c::shared-lib
     iceoryx2-cxx::includes-only-cxx
 )

@@ -19,6 +19,8 @@
 //! ## Callbacks for signals
 //!
 //! ```
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_posix::signal::*;
 //!
 //! fn some_call_which_may_emits_sigabrt() {}
@@ -36,6 +38,8 @@
 //! ## Perform tasks until CTRL+c was pressed.
 //!
 //! ```no_run
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_posix::signal::*;
 //!
 //! fn some_task() {}
@@ -48,6 +52,8 @@
 //! ## Wait until CTRL+c was pressed.
 //!
 //! ```no_run
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_posix::signal::*;
 //!
 //! SignalHandler::wait_for_signal(NonFatalFetchableSignal::Terminate);
@@ -67,14 +73,21 @@ use crate::{
     clock::{ClockType, NanosleepError, Time, TimeError},
     mutex::*,
 };
-use core::sync::atomic::Ordering;
 use enum_iterator::{all, Sequence};
+use iceoryx2_bb_concurrency::atomic::AtomicUsize;
+use iceoryx2_bb_concurrency::atomic::Ordering;
+use iceoryx2_bb_concurrency::lazy_lock::LazyLock;
 use iceoryx2_bb_elementary::enum_gen;
-use iceoryx2_bb_log::{fail, fatal_panic};
-use iceoryx2_pal_concurrency_sync::iox_atomic::IoxAtomicUsize;
+use iceoryx2_log::{fail, fatal_panic, trace};
 use iceoryx2_pal_posix::posix::{Errno, MemZeroedStruct};
 use iceoryx2_pal_posix::*;
-use lazy_static::lazy_static;
+
+static HANDLE: LazyLock<MutexHandle<SignalHandler>> = LazyLock::new(MutexHandle::new);
+static MTX: LazyLock<Mutex<'static, 'static, SignalHandler>> = LazyLock::new(|| {
+    fatal_panic!(from "SignalHandler::instance",
+        when MutexBuilder::new().create(SignalHandler::new(), &HANDLE),
+        "Unable to create global signal handler")
+});
 
 macro_rules! define_signals {
     {fetchable: $($entry:ident = $nn:ident::$value:ident),*
@@ -219,9 +232,9 @@ define_signals! {
     StopExecution = posix::SIGSTOP
 }
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum SignalRegisterError {
-    AlreadyRegistered,
+enum_gen! { SignalRegisterError
+  entry:
+    AlreadyRegistered
 }
 
 enum_gen! { SignalWaitError
@@ -270,7 +283,13 @@ impl Drop for SignalGuard {
     }
 }
 
-static LAST_SIGNAL: IoxAtomicUsize = IoxAtomicUsize::new(posix::MAX_SIGNAL_VALUE);
+#[cfg(not(all(test, loom, feature = "std")))]
+static LAST_SIGNAL: AtomicUsize = AtomicUsize::new(posix::MAX_SIGNAL_VALUE);
+
+#[cfg(all(test, loom, feature = "std"))]
+static LAST_SIGNAL: std::sync::LazyLock<IoxAtomicUsize> = std::sync::LazyLock::new(|| {
+    unimplemented!("loom does not provide const-initialization for atomic variables.")
+});
 
 /// Manages POSIX signal handling. It provides an interface to register custom callbacks for
 /// signals, to perform a blocking wait until a certain signal arrived (for instance like CTRL+c) and
@@ -314,6 +333,7 @@ extern "C" fn handler(signal: posix::int) {
 
 extern "C" fn capture_signal(signal: posix::int) {
     LAST_SIGNAL.store(signal as usize, Ordering::Relaxed);
+    trace!("received signal: {signal}");
 }
 
 impl Drop for SignalHandler {
@@ -329,6 +349,8 @@ impl SignalHandler {
     /// signal guard goes out of scope the callback is unregistered.
     ///
     /// ```
+    /// # extern crate iceoryx2_bb_loggers;
+    ///
     /// use iceoryx2_bb_posix::signal::*;
     ///
     /// fn custom_callback(signal: FetchableSignal) {
@@ -411,6 +433,8 @@ impl SignalHandler {
 
     /// Blocks until the provided signal was raised or an error occurred.
     /// ```no_run
+    /// # extern crate iceoryx2_bb_loggers;
+    ///
     /// use iceoryx2_bb_posix::signal::*;
     ///
     /// SignalHandler::wait_for_signal(NonFatalFetchableSignal::Terminate);
@@ -445,6 +469,8 @@ impl SignalHandler {
     /// Blocks until the provided signal was raised or the timeout was reached. If the signal was
     /// raised it returns true otherwise false.
     /// ```ignore
+    /// # extern crate iceoryx2_bb_loggers;
+    ///
     /// use iceoryx2_bb_posix::signal::*;
     /// use core::time::Duration;
     ///
@@ -517,33 +543,29 @@ impl SignalHandler {
         sighandle.register_raw_signal(
             FetchableSignal::Interrupt,
             match is_signal_registered {
-                true => handler as posix::sighandler_t,
-                false => capture_signal as posix::sighandler_t,
+                true => handler as *const () as posix::sighandler_t,
+                false => capture_signal as *const () as posix::sighandler_t,
             },
         );
     }
 
     fn new() -> Self {
         let mut sighandle = SignalHandler {
-            registered_signals: core::array::from_fn(|_| None),
+            registered_signals: [const { None }; posix::MAX_SIGNAL_VALUE],
             do_repeat_eintr_call: false,
         };
 
         for signal in all::<NonFatalFetchableSignal>().collect::<Vec<_>>() {
-            sighandle.register_raw_signal(signal.into(), capture_signal as posix::sighandler_t);
+            sighandle.register_raw_signal(
+                signal.into(),
+                capture_signal as *const () as posix::sighandler_t,
+            );
         }
 
         sighandle
     }
 
     fn instance() -> MutexGuard<'static, Self> {
-        lazy_static! {
-            static ref HANDLE: MutexHandle<SignalHandler> = MutexHandle::new();
-            static ref MTX: Mutex<'static, 'static, SignalHandler> = fatal_panic!(from "SignalHandler::instance",
-                when MutexBuilder::new().create(SignalHandler::new(), &HANDLE),
-                "Unable to create global signal handler");
-        }
-
         fatal_panic!(from "SignalHandler::instance", when MTX.lock(),
             "Unable to acquire global SignalHandler")
     }
@@ -598,7 +620,8 @@ impl SignalHandler {
             fail!(from self, with SignalRegisterError::AlreadyRegistered, "The Signal::{:?} is already registered.", signal);
         }
 
-        let previous_action = self.register_raw_signal(signal, handler as posix::sighandler_t);
+        let previous_action =
+            self.register_raw_signal(signal, handler as *const () as posix::sighandler_t);
         self.registered_signals[signal as usize] = Some(callback);
 
         Ok(previous_action)
@@ -615,5 +638,11 @@ impl SignalHandler {
 
         self.registered_signals[detail.signal as usize] = None;
         self.register_signal_from_state(detail);
+    }
+
+    pub fn abort() {
+        unsafe {
+            iceoryx2_pal_posix::posix::abort();
+        }
     }
 }

@@ -14,11 +14,10 @@ use alloc::collections::BTreeSet;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use iceoryx2_bb_log::{fail, fatal_panic};
+use iceoryx2_bb_concurrency::lazy_lock::LazyLock;
 use iceoryx2_bb_posix::mutex::*;
 use iceoryx2_bb_system_types::{file_name::FileName, file_path::FilePath, path::Path};
-
-use once_cell::sync::Lazy;
+use iceoryx2_log::{fail, fatal_panic};
 
 use crate::{
     monitoring::{MonitoringCreateCleanerError, MonitoringCreateTokenError, MonitoringStateError},
@@ -30,19 +29,17 @@ use super::{
     NamedConcept, NamedConceptBuilder, NamedConceptMgmt, State,
 };
 
-static PROCESS_LOCAL_MTX_HANDLE: Lazy<MutexHandle<BTreeSet<FilePath>>> =
-    Lazy::new(MutexHandle::new);
-static PROCESS_LOCAL_STORAGE: Lazy<Mutex<BTreeSet<FilePath>>> = Lazy::new(|| {
-    let result = MutexBuilder::new()
-        .is_interprocess_capable(false)
-        .create(BTreeSet::new(), &PROCESS_LOCAL_MTX_HANDLE);
+static PROCESS_LOCAL_MTX_HANDLE: LazyLock<MutexHandle<BTreeSet<FilePath>>> =
+    LazyLock::new(MutexHandle::new);
 
-    if result.is_err() {
-        fatal_panic!(from "PROCESS_LOCAL_STORAGE", "Failed to create global monitoring storage");
-    }
-
-    result.unwrap()
-});
+static PROCESS_LOCAL_STORAGE: LazyLock<Mutex<'static, 'static, BTreeSet<FilePath>>> =
+    LazyLock::new(|| {
+        fatal_panic!(from "PROCESS_LOCAL_STORAGE",
+            when MutexBuilder::new()
+                .is_interprocess_capable(false)
+                .create(BTreeSet::new(), &PROCESS_LOCAL_MTX_HANDLE),
+            "Failed to create global monitoring storage")
+    });
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Configuration {

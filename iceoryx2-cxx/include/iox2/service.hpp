@@ -13,9 +13,9 @@
 #ifndef IOX2_SERVICE_HPP
 #define IOX2_SERVICE_HPP
 
-#include "iox/expected.hpp"
-#include "iox/function.hpp"
-#include "iox/optional.hpp"
+#include "iox2/bb/expected.hpp"
+#include "iox2/bb/optional.hpp"
+#include "iox2/bb/static_function.hpp"
 #include "iox2/callback_progression.hpp"
 #include "iox2/config.hpp"
 #include "iox2/messaging_pattern.hpp"
@@ -34,15 +34,16 @@ class Service {
   public:
     /// Checks if a service under a given [`ConfigView`] does exist.
     static auto does_exist(const ServiceName& service_name, ConfigView config, MessagingPattern messaging_pattern)
-        -> iox::expected<bool, ServiceDetailsError>;
+        -> bb::Expected<bool, ServiceDetailsError>;
 
     /// Acquires the [`ServiceDetails`] of a [`Service`].
     static auto details(const ServiceName& service_name, ConfigView config, MessagingPattern messaging_pattern)
-        -> iox::expected<iox::optional<ServiceDetails<S>>, ServiceDetailsError>;
+        -> bb::Expected<bb::Optional<ServiceDetails<S>>, ServiceDetailsError>;
 
     /// Returns a list of all services created under a given [`config::Config`].
-    static auto list(ConfigView config, const iox::function<CallbackProgression(ServiceDetails<S>)>& callback)
-        -> iox::expected<void, ServiceListError>;
+    static auto list(ConfigView config,
+                     const iox2::bb::StaticFunction<CallbackProgression(ServiceDetails<S>)>& callback)
+        -> bb::Expected<void, ServiceListError>;
 };
 } // namespace iox2
 

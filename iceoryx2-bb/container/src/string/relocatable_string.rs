@@ -18,6 +18,8 @@
 //! ## Create [`RelocatableString`] inside construct which provides memory
 //!
 //! ```
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_container::string::*;
 //! use iceoryx2_bb_elementary::math::align_to;
 //! use iceoryx2_bb_elementary::bump_allocator::BumpAllocator;
@@ -33,7 +35,7 @@
 //!     pub fn new() -> Self {
 //!         let mut new_self = Self {
 //!             my_str: unsafe { RelocatableString::new_uninit(STRING_CAPACITY) },
-//!             str_memory: core::array::from_fn(|_| MaybeUninit::uninit()),
+//!             str_memory: [const { MaybeUninit::uninit() }; STRING_CAPACITY + 1] ,
 //!         };
 //!
 //!         let allocator = BumpAllocator::new(new_self.str_memory.as_mut_ptr().cast());
@@ -48,6 +50,8 @@
 //! ## Create [`RelocatableString`] with allocator
 //!
 //! ```
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_container::string::*;
 //! use iceoryx2_bb_elementary::bump_allocator::BumpAllocator;
 //! use core::ptr::NonNull;
@@ -72,7 +76,7 @@ use iceoryx2_bb_elementary::math::unaligned_mem_size;
 use iceoryx2_bb_elementary::relocatable_ptr::RelocatablePointer;
 use iceoryx2_bb_elementary_traits::pointer_trait::PointerTrait;
 pub use iceoryx2_bb_elementary_traits::relocatable_container::RelocatableContainer;
-use iceoryx2_bb_log::{fail, fatal_panic};
+use iceoryx2_log::{fail, fatal_panic};
 
 use crate::string::{as_escaped_string, internal, String};
 

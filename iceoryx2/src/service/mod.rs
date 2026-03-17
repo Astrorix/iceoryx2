@@ -257,7 +257,7 @@ use core::fmt::Debug;
 use core::time::Duration;
 
 use alloc::format;
-use alloc::string::String;
+use alloc::string::String as CoreString;
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -271,7 +271,6 @@ use crate::service::static_config::*;
 use config_scheme::service_tag_config;
 use iceoryx2_bb_container::semantic_string::SemanticString;
 use iceoryx2_bb_elementary::CallbackProgression;
-use iceoryx2_bb_log::{debug, fail, trace, warn};
 use iceoryx2_cal::arc_sync_policy::ArcSyncPolicy;
 use iceoryx2_cal::dynamic_storage::{
     DynamicStorage, DynamicStorageBuilder, DynamicStorageOpenError,
@@ -288,6 +287,7 @@ use iceoryx2_cal::shared_memory::{SharedMemory, SharedMemoryForPoolAllocator};
 use iceoryx2_cal::shm_allocator::bump_allocator::BumpAllocator;
 use iceoryx2_cal::static_storage::*;
 use iceoryx2_cal::zero_copy_connection::ZeroCopyConnection;
+use iceoryx2_log::{debug, fail, trace, warn};
 use service_id::ServiceId;
 
 use self::dynamic_config::DeregisterNodeState;
@@ -449,7 +449,7 @@ pub mod internal {
     use builder::event::EventOpenError;
     use dynamic_config::{PortCleanupAction, RemoveDeadNodeResult};
     use iceoryx2_bb_container::string::*;
-    use iceoryx2_bb_log::error;
+    use iceoryx2_log::error;
     use port_factory::PortFactory;
 
     use crate::{
@@ -515,8 +515,8 @@ pub mod internal {
             return;
         }
 
-        let event_id = match service.static_config().notifier_dead_event {
-            Some(event_id) => event_id,
+        let event_id = match service.static_config().notifier_dead_event.as_option_ref() {
+            Some(event_id) => *event_id,
             None => return,
         };
 
@@ -1005,7 +1005,7 @@ pub fn __internal_details<S: Service>(
         }
     };
 
-    let mut content = String::from_utf8(vec![b' '; reader.len() as usize]).unwrap();
+    let mut content = CoreString::from_utf8(vec![b' '; reader.len() as usize]).unwrap();
     if let Err(e) = reader.read(unsafe { content.as_mut_vec().as_mut_slice() }) {
         fail!(from origin, with ServiceDetailsError::FailedToReadStaticServiceInfo,
                 "{} since the static service info \"{}\" could not be read ({:?}).",

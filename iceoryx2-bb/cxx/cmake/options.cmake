@@ -10,17 +10,33 @@
 #
 # SPDX-License-Identifier: Apache-2.0 OR MIT
 
-if(NOT ICEORYX2_CXX_OPTIONS_AND_PARAMS_LISTED)
-    set(ICEORYX2_CXX_OPTIONS_AND_PARAMS_LISTED true)
+if(NOT ICEORYX2_BB_CXX_OPTIONS_AND_PARAMS_LISTED)
+    set(ICEORYX2_BB_CXX_OPTIONS_AND_PARAMS_LISTED true)
 
-    # NOTE: uncomment the lines below to add C++ binding specific options
+    message(STATUS "[i] iceoryx2-bb-cxx options:")
 
-    # message(STATUS "[i] iceoryx2-bb-cxx options:")
-    #
-    # add_option(
-    #     NAME HYPNOTOAD
-    #     DESCRIPTION "Enables hypnotoad"
-    #     DEFAULT_VALUE ON
-    # )
+    add_option(
+        NAME IOX2_BB_CXX_CONFIG_USE_STD_EXPECTED
+        DESCRIPTION "Use the STL 'expected' instead of the iceoryx2 implementation"
+        DEFAULT_VALUE OFF
+    )
+
+    add_option(
+        NAME IOX2_BB_CXX_CONFIG_USE_STD_OPTIONAL
+        DESCRIPTION "Use the STL 'optional' instead of the iceoryx2 implementation"
+        DEFAULT_VALUE OFF
+    )
+
+    add_option(
+        NAME IOX2_BB_CXX_CONFIG_USE_CUSTOM_VOCABULARY_TYPES
+        DESCRIPTION "Use custom 'optional' and 'expected' instead of the iceoryx2 implementation"
+        DEFAULT_VALUE OFF
+    )
+
+    add_param(
+        NAME IOX2_BB_CXX_CONFIG_CUSTOM_VOCABULARY_TYPES_CMAKE_TARGET
+        DESCRIPTION "CMake target for custom 'optional' and 'expected'"
+        DEFAULT_VALUE ""
+    )
 
 endif()

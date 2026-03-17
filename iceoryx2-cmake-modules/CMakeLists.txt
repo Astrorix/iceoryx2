@@ -12,7 +12,7 @@
 
 cmake_minimum_required(VERSION 3.16)
 
-set(IOX2_VERSION 0.7.0)
+set(IOX2_VERSION 0.8.999)
 project(iceoryx2-cmake-modules VERSION ${IOX2_VERSION})
 
 #
@@ -35,6 +35,23 @@ set(${PROJECT_NAME}_DIR ${PROJECT_SOURCE_DIR}/cmake
     CACHE FILEPATH
     "${PROJECT_NAME}Config.cmake to make find_package(${PROJECT_NAME}) work in source tree!"
     FORCE
+)
+
+#
+########## define C++ version ##########
+#
+
+if (CMAKE_SYSTEM_NAME MATCHES Windows OR CMAKE_SYSTEM_NAME MATCHES Darwin)
+    set(IOX2_CXX_STD_VERSION_DEFAULT 17)
+else()
+    set(IOX2_CXX_STD_VERSION_DEFAULT 14)
+endif()
+
+include(modules/Iceoryx2OptionAndParamMacros.cmake)
+include(cmake/options.cmake)
+
+configure_file(cmake/Iceoryx2CxxStdVersion.cmake.in
+               ${CMAKE_BINARY_DIR}/generated/iceoryx2-cmake-modules/modules/Iceoryx2CxxStdVersion.cmake @ONLY
 )
 
 #
@@ -74,10 +91,17 @@ install(
     DESTINATION ${DESTINATION_CONFIGDIR}/modules
     COMPONENT dev
 )
+install(
+    DIRECTORY "${CMAKE_BINARY_DIR}/generated/iceoryx2-cmake-modules/modules/"
+    DESTINATION ${DESTINATION_CONFIGDIR}/modules
+    COMPONENT dev
+)
 
 # license
 install(
-    FILES ${PROJECT_SOURCE_DIR}/LICENSE-APACHE  ${PROJECT_SOURCE_DIR}/LICENSE-MIT
+    FILES ${PROJECT_SOURCE_DIR}/LICENSE-APACHE
+        ${PROJECT_SOURCE_DIR}/LICENSE-MIT
+        ${PROJECT_SOURCE_DIR}/NOTICE.md
     DESTINATION ${DESTINATION_DATAROOTDIR}/doc/${PROJECT_NAME}
     COMPONENT dev
 )

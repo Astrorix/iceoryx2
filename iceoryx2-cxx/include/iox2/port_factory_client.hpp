@@ -13,8 +13,9 @@
 #ifndef IOX2_PORTFACTORY_CLIENT_HPP
 #define IOX2_PORTFACTORY_CLIENT_HPP
 
-#include "iox/builder_addendum.hpp"
-#include "iox/expected.hpp"
+#include "iox2/bb/detail/builder.hpp"
+#include "iox2/bb/expected.hpp"
+#include "iox2/bb/optional.hpp"
 #include "iox2/client.hpp"
 #include "iox2/client_error.hpp"
 #include "iox2/service_type.hpp"
@@ -36,7 +37,7 @@ class PortFactoryClient {
 #ifdef DOXYGEN_MACRO_FIX
     auto unable_to_deliver_strategy(const UnableToDeliverStrategy value) -> decltype(auto);
 #else
-    IOX_BUILDER_OPTIONAL(UnableToDeliverStrategy, unable_to_deliver_strategy);
+    IOX2_BUILDER_OPTIONAL(UnableToDeliverStrategy, unable_to_deliver_strategy);
 #endif
 
   public:
@@ -47,20 +48,20 @@ class PortFactoryClient {
     ~PortFactoryClient() = default;
 
     /// Sets the maximum number of elements that can be loaned in a slice.
-    template <typename T = RequestPayload, typename = std::enable_if_t<iox::IsSlice<T>::VALUE, void>>
+    template <typename T = RequestPayload, typename = std::enable_if_t<bb::IsSlice<T>::VALUE, void>>
     auto initial_max_slice_len(uint64_t value) && -> PortFactoryClient&&;
 
     /// Defines the allocation strategy that is used when the provided
     /// [`PortFactoryClient::initial_max_slice_len()`] is exhausted. This happens when the user
     /// acquires more than max slice len in [`Client::loan_slice()`] or
     /// [`Client::loan_slice_uninit()`].
-    template <typename T = RequestPayload, typename = std::enable_if_t<iox::IsSlice<T>::VALUE, void>>
+    template <typename T = RequestPayload, typename = std::enable_if_t<bb::IsSlice<T>::VALUE, void>>
     auto allocation_strategy(AllocationStrategy value) && -> PortFactoryClient&&;
 
     /// Creates a new [`Client`] or returns a [`ClientCreateError`] on failure.
-    auto create() && -> iox::expected<
-        Client<Service, RequestPayload, RequestUserHeader, ResponsePayload, ResponseUserHeader>,
-        ClientCreateError>;
+    auto
+    create() && -> bb::Expected<Client<Service, RequestPayload, RequestUserHeader, ResponsePayload, ResponseUserHeader>,
+                                ClientCreateError>;
 
   private:
     template <ServiceType, typename, typename, typename, typename>
@@ -69,8 +70,8 @@ class PortFactoryClient {
     explicit PortFactoryClient(iox2_port_factory_client_builder_h handle);
 
     iox2_port_factory_client_builder_h m_handle = nullptr;
-    iox::optional<uint64_t> m_max_slice_len;
-    iox::optional<AllocationStrategy> m_allocation_strategy;
+    bb::Optional<uint64_t> m_max_slice_len;
+    bb::Optional<AllocationStrategy> m_allocation_strategy;
 };
 
 template <ServiceType Service,
@@ -103,32 +104,32 @@ template <ServiceType Service,
           typename RequestUserHeader,
           typename ResponsePayload,
           typename ResponseUserHeader>
-inline auto
-PortFactoryClient<Service, RequestPayload, RequestUserHeader, ResponsePayload, ResponseUserHeader>::create() && -> iox::
-    expected<Client<Service, RequestPayload, RequestUserHeader, ResponsePayload, ResponseUserHeader>,
-             ClientCreateError> {
-    m_unable_to_deliver_strategy.and_then([&](auto value) -> auto {
+inline auto PortFactoryClient<Service, RequestPayload, RequestUserHeader, ResponsePayload, ResponseUserHeader>::
+    create() && -> bb::Expected<Client<Service, RequestPayload, RequestUserHeader, ResponsePayload, ResponseUserHeader>,
+                                ClientCreateError> {
+    if (m_unable_to_deliver_strategy.has_value()) {
         iox2_port_factory_client_builder_unable_to_deliver_strategy(
-            &m_handle, static_cast<iox2_unable_to_deliver_strategy_e>(iox::into<int>(value)));
-    });
-    m_max_slice_len
-        .and_then(
-            [&](auto value) -> auto { iox2_port_factory_client_builder_set_initial_max_slice_len(&m_handle, value); })
-        .or_else([&]() -> auto { iox2_port_factory_client_builder_set_initial_max_slice_len(&m_handle, 1); });
-    m_allocation_strategy.and_then([&](auto value) -> auto {
-        iox2_port_factory_client_builder_set_allocation_strategy(&m_handle,
-                                                                 iox::into<iox2_allocation_strategy_e>(value));
-    });
+            &m_handle,
+            static_cast<iox2_unable_to_deliver_strategy_e>(bb::into<int>(m_unable_to_deliver_strategy.value())));
+    }
+    if (m_max_slice_len.has_value()) {
+        iox2_port_factory_client_builder_set_initial_max_slice_len(&m_handle, m_max_slice_len.value());
+    } else {
+        iox2_port_factory_client_builder_set_initial_max_slice_len(&m_handle, 1);
+    }
+    if (m_allocation_strategy.has_value()) {
+        iox2_port_factory_client_builder_set_allocation_strategy(
+            &m_handle, bb::into<iox2_allocation_strategy_e>(m_allocation_strategy.value()));
+    }
 
     iox2_client_h client_handle {};
     auto result = iox2_port_factory_client_builder_create(m_handle, nullptr, &client_handle);
 
     if (result == IOX2_OK) {
-        return iox::ok(
-            Client<Service, RequestPayload, RequestUserHeader, ResponsePayload, ResponseUserHeader>(client_handle));
+        return Client<Service, RequestPayload, RequestUserHeader, ResponsePayload, ResponseUserHeader>(client_handle);
     }
 
-    return iox::err(iox::into<ClientCreateError>(result));
+    return bb::err(bb::into<ClientCreateError>(result));
 }
 
 template <ServiceType Service,

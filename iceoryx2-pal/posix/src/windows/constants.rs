@@ -22,6 +22,9 @@ pub const NULL_TERMINATOR: c_char = 0;
 pub const USER_NAME_LENGTH: usize = 255;
 pub const GROUP_NAME_LENGTH: usize = 31;
 
+pub const STDOUT_FILENO: u32 = 1;
+pub const STDERR_FILENO: u32 = 2;
+
 pub const O_RDONLY: int = 1;
 pub const O_WRONLY: int = 2;
 pub const O_RDWR: int = 4;
@@ -132,8 +135,8 @@ pub const SIGVTALRM: int = 24;
 pub const SIGXCPU: int = 25;
 pub const SIGXFSZ: int = 26;
 pub const SIG_ERR: sighandler_t = sighandler_t::MAX;
-pub const SIG_DFL: int = 0;
-pub const SIG_IGN: int = 1;
+pub const SIG_DFL: sighandler_t = 0;
+pub const SIG_IGN: sighandler_t = 1;
 pub const SA_RESTART: int = 1;
 
 pub const AF_LOCAL: sa_family_t = windows_sys::Win32::Networking::WinSock::AF_UNIX as _;

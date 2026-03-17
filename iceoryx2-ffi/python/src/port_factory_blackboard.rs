@@ -12,7 +12,7 @@
 
 use iceoryx2::prelude::{CallbackProgression, PortFactory};
 use iceoryx2::service::builder::CustomKeyMarker;
-use iceoryx2_bb_log::fatal_panic;
+use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
 
 use crate::attribute_set::AttributeSet;
@@ -68,11 +68,16 @@ impl PortFactoryBlackboard {
 #[pymethods]
 impl PortFactoryBlackboard {
     #[getter]
+    pub fn __key_type_details(&self) -> Option<Py<PyAny>> {
+        self.key_type_storage.clone().value
+    }
+
+    #[getter]
     /// Returns the `ServiceName` of the service.
     pub fn name(&self) -> ServiceName {
         match &*self.value.lock() {
-            PortFactoryBlackboardType::Ipc(Some(v)) => ServiceName(v.name().clone()),
-            PortFactoryBlackboardType::Local(Some(v)) => ServiceName(v.name().clone()),
+            PortFactoryBlackboardType::Ipc(Some(v)) => ServiceName(*v.name()),
+            PortFactoryBlackboardType::Local(Some(v)) => ServiceName(*v.name()),
             _ => {
                 fatal_panic!(from "PortFactoryBlackboard::name()", "Accessing a deleted PortFactoryBlackboard.")
             }
@@ -108,12 +113,8 @@ impl PortFactoryBlackboard {
     /// the lifetime of the service.
     pub fn static_config(&self) -> StaticConfigBlackboard {
         match &*self.value.lock() {
-            PortFactoryBlackboardType::Ipc(Some(v)) => {
-                StaticConfigBlackboard(v.static_config().clone())
-            }
-            PortFactoryBlackboardType::Local(Some(v)) => {
-                StaticConfigBlackboard(v.static_config().clone())
-            }
+            PortFactoryBlackboardType::Ipc(Some(v)) => StaticConfigBlackboard(*v.static_config()),
+            PortFactoryBlackboardType::Local(Some(v)) => StaticConfigBlackboard(*v.static_config()),
             _ => {
                 fatal_panic!(from "PortFactoryBlackboard::static_config()", "Accessing a deleted PortFactoryBlackboard.")
             }
@@ -195,5 +196,27 @@ impl PortFactoryBlackboard {
                 v.take();
             }
         }
+    }
+
+    pub fn __list_keys(&self) -> Vec<usize> {
+        let mut keys = Vec::new();
+        match &*self.value.lock() {
+            PortFactoryBlackboardType::Ipc(Some(v)) => {
+                v.__internal_list_keys(|key| {
+                    keys.push(key as usize);
+                    CallbackProgression::Continue
+                });
+            }
+            PortFactoryBlackboardType::Local(Some(v)) => {
+                v.__internal_list_keys(|key| {
+                    keys.push(key as usize);
+                    CallbackProgression::Continue
+                });
+            }
+            _ => {
+                fatal_panic!(from "PortFactoryBlackboard::list_keys()", "Accessing a deleted PortFactoryBlackboard.")
+            }
+        }
+        keys
     }
 }

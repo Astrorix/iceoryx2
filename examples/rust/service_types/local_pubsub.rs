@@ -17,12 +17,11 @@ extern crate alloc;
 use alloc::boxed::Box;
 
 use iceoryx2::prelude::*;
-use iceoryx2_bb_log::cout;
 use iceoryx2_bb_posix::clock::nanosleep;
 use iceoryx2_bb_posix::thread::{ThreadBuilder, ThreadName};
 
-const CYCLE_TIME: Duration = Duration::from_secs(1);
 static KEEP_RUNNING: AtomicBool = AtomicBool::new(true);
+const CYCLE_TIME: Duration = Duration::from_secs(1);
 
 fn background_thread() {
     // Another node is created inside this thread to communicate with the main thread
@@ -44,13 +43,14 @@ fn background_thread() {
     while KEEP_RUNNING.load(Ordering::Relaxed) {
         nanosleep(CYCLE_TIME).unwrap();
         while let Some(sample) = subscriber.receive().unwrap() {
-            cout!("[thread] received: {}", sample.payload());
+            coutln!("[thread] received: {}", sample.payload());
         }
     }
 }
 
 fn main() -> Result<(), Box<dyn core::error::Error>> {
     set_log_level_from_env_or(LogLevel::Info);
+
     let node = NodeBuilder::new()
         // Optionally, a name can be provided to the node which helps identifying them later during
         // debugging or introspection
@@ -73,14 +73,14 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
 
     let mut counter = 0u64;
     while node.wait(CYCLE_TIME).is_ok() {
-        cout!("send: {counter}");
+        coutln!("send: {counter}");
         publisher.send_copy(counter)?;
         counter += 1;
     }
 
     KEEP_RUNNING.store(false, Ordering::Relaxed);
     drop(background_thread);
-    cout!("exit");
+    coutln!("exit");
 
     Ok(())
 }

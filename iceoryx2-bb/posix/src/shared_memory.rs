@@ -23,6 +23,8 @@
 //! ## Create non-existing shared memory.
 //!
 //! ```
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_posix::shared_memory::*;
 //! use iceoryx2_bb_system_types::file_name::FileName;
 //! use iceoryx2_bb_container::semantic_string::*;
@@ -49,6 +51,8 @@
 //! ## Open existing shared memory.
 //!
 //! ```no_run
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_posix::shared_memory::*;
 //! use iceoryx2_bb_system_types::file_name::FileName;
 //! use iceoryx2_bb_container::semantic_string::*;
@@ -64,18 +68,18 @@
 //! ```
 
 use core::ptr::NonNull;
-use core::sync::atomic::Ordering;
 
 use alloc::vec;
 use alloc::vec::Vec;
 
+use iceoryx2_bb_concurrency::atomic::AtomicBool;
+use iceoryx2_bb_concurrency::atomic::Ordering;
 use iceoryx2_bb_container::semantic_string::*;
 use iceoryx2_bb_elementary::enum_gen;
-use iceoryx2_bb_log::{error, fail, fatal_panic, trace};
 use iceoryx2_bb_system_types::file_name::*;
 use iceoryx2_bb_system_types::file_path::*;
 use iceoryx2_bb_system_types::path::*;
-use iceoryx2_pal_concurrency_sync::iox_atomic::IoxAtomicBool;
+use iceoryx2_log::{error, fail, fatal_panic, trace, warn};
 use iceoryx2_pal_configuration::PATH_SEPARATOR;
 use iceoryx2_pal_posix::posix::errno::Errno;
 use iceoryx2_pal_posix::posix::POSIX_SUPPORT_ADVANCED_SIGNAL_HANDLING;
@@ -86,7 +90,6 @@ pub use crate::access_mode::AccessMode;
 pub use crate::creation_mode::CreationMode;
 use crate::file::{FileStatError, FileTruncateError};
 use crate::file_descriptor::*;
-use crate::handle_errno;
 use crate::memory_lock::{MemoryLock, MemoryLockCreationError};
 use crate::memory_mapping::{
     MappingBehavior, MemoryMapping, MemoryMappingBuilder, MemoryMappingCreationError,
@@ -219,13 +222,13 @@ impl SharedMemoryBuilder {
 
         let shm = SharedMemory {
             name: self.name,
-            has_ownership: IoxAtomicBool::new(false),
+            has_ownership: AtomicBool::new(false),
             memory_lock: None,
             memory_mapping,
             mapping_offset: self.mapping_offset,
         };
 
-        trace!(from shm, "open");
+        trace!(from shm, "opened");
         Ok(shm)
     }
 
@@ -334,13 +337,13 @@ impl SharedMemoryCreationBuilder {
 
             let shm = SharedMemory {
                 name: self.config.name,
-                has_ownership: IoxAtomicBool::new(self.config.has_ownership),
+                has_ownership: AtomicBool::new(self.config.has_ownership),
                 memory_lock: None,
                 memory_mapping,
                 mapping_offset: self.config.mapping_offset,
             };
 
-            trace!(from shm, "open");
+            trace!(from shm, "opened");
             return Ok(shm);
         }
 
@@ -359,7 +362,7 @@ impl SharedMemoryCreationBuilder {
 
         let mut shm = SharedMemory {
             name: self.config.name,
-            has_ownership: IoxAtomicBool::new(self.config.has_ownership),
+            has_ownership: AtomicBool::new(self.config.has_ownership),
             memory_lock: None,
             memory_mapping,
             mapping_offset: self.config.mapping_offset,
@@ -399,7 +402,7 @@ impl SharedMemoryCreationBuilder {
             }
         }
 
-        trace!(from shm, "create");
+        trace!(from shm, "created");
         Ok(shm)
     }
 }
@@ -408,7 +411,7 @@ impl SharedMemoryCreationBuilder {
 #[derive(Debug)]
 pub struct SharedMemory {
     name: FileName,
-    has_ownership: IoxAtomicBool,
+    has_ownership: AtomicBool,
     memory_mapping: MemoryMapping,
     memory_lock: Option<MemoryLock>,
     mapping_offset: isize,
@@ -417,20 +420,21 @@ pub struct SharedMemory {
 impl Drop for SharedMemory {
     fn drop(&mut self) {
         if self.has_ownership() {
-            match self.set_permission(Permission::OWNER_ALL) {
-                Ok(()) => match Self::shm_unlink(&self.name) {
-                    Ok(_) => {
-                        trace!(from self, "delete");
+            let set_permission_result = self.set_permission(Permission::OWNER_ALL);
+
+            match Self::remove(&self.name) {
+                Ok(_) => {}
+                Err(_) => {
+                    if let Err(e) = set_permission_result {
+                        warn!(from self,
+                              "Unable to adjust the files permission as preparation to remove the file ({e:?}).");
                     }
-                    Err(_) => {
-                        error!(from self, "Failed to cleanup shared memory.");
-                    }
-                },
-                Err(e) => {
-                    error!(from self, "Failed to cleanup shared memory since the permissions could not be adjusted ({:?}).", e);
+                    error!(from self, "Failed to cleanup shared memory.");
                 }
             }
         }
+
+        trace!(from self, "closed")
     }
 }
 
@@ -483,7 +487,7 @@ impl SharedMemory {
     pub fn remove(name: &FileName) -> Result<bool, SharedMemoryRemoveError> {
         match Self::shm_unlink(name) {
             Ok(true) => {
-                trace!(from "SharedMemory::remove", "\"{}\"", name);
+                trace!(from "SharedMemory::remove()", "\"{}\"", name);
                 Ok(true)
             }
             Ok(false) => Ok(false),

@@ -10,11 +10,16 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+#![cfg_attr(not(any(test, feature = "std")), no_std)]
 #![warn(clippy::alloc_instead_of_core)]
 #![warn(clippy::std_instead_of_alloc)]
 #![warn(clippy::std_instead_of_core)]
 
 extern crate alloc;
+
+// Required for MVSC
+#[cfg(test)]
+extern crate iceoryx2_bb_loggers;
 
 pub mod arc_sync_policy;
 pub mod communication_channel;

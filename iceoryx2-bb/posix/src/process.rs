@@ -25,6 +25,8 @@
 //! # Examples
 //!
 //! ```no_run
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_posix::process::*;
 //! use iceoryx2_bb_posix::scheduler::*;
 //!
@@ -41,10 +43,9 @@
 //! ```
 use core::fmt::Display;
 
-use crate::handle_errno;
 use iceoryx2_bb_elementary::enum_gen;
-use iceoryx2_bb_log::fail;
 use iceoryx2_bb_system_types::file_path::*;
+use iceoryx2_log::{fail, trace};
 use iceoryx2_pal_posix::posix::{errno::Errno, MemZeroedStruct};
 use iceoryx2_pal_posix::*;
 
@@ -53,10 +54,10 @@ use crate::{
     signal::Signal,
 };
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum ProcessExecutablePathError {
+enum_gen! { ProcessExecutablePathError
+  entry:
     ContainsInvalidCharacters,
-    UnableToRead,
+    UnableToRead
 }
 
 enum_gen! { ProcessSendSignalError
@@ -191,6 +192,7 @@ impl Process {
     /// Sends a signal to the process.
     pub fn send_signal(&self, signal: Signal) -> Result<(), ProcessSendSignalError> {
         if unsafe { posix::kill(self.pid.0, signal as i32) } == 0 {
+            trace!(from self, "send signal: {signal:?}");
             return Ok(());
         }
 

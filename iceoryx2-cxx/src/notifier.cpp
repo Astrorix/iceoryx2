@@ -48,40 +48,40 @@ auto Notifier<S>::id() const -> UniqueNotifierId {
 }
 
 template <ServiceType S>
-auto Notifier<S>::notify() const -> iox::expected<size_t, NotifierNotifyError> {
+auto Notifier<S>::notify() const -> bb::Expected<size_t, NotifierNotifyError> {
     size_t number_of_notified_listeners = 0;
     auto result = iox2_notifier_notify(&m_handle, &number_of_notified_listeners);
 
     if (result == IOX2_OK) {
-        return iox::ok(number_of_notified_listeners);
+        return number_of_notified_listeners;
     }
 
-    return iox::err(iox::into<NotifierNotifyError>(result));
+    return bb::err(bb::into<NotifierNotifyError>(result));
 }
 
 template <ServiceType S>
-auto Notifier<S>::notify_with_custom_event_id(EventId event_id) const -> iox::expected<size_t, NotifierNotifyError> {
+auto Notifier<S>::notify_with_custom_event_id(EventId event_id) const -> bb::Expected<size_t, NotifierNotifyError> {
     size_t number_of_notified_listeners = 0;
     auto result =
         iox2_notifier_notify_with_custom_event_id(&m_handle, &event_id.m_value, &number_of_notified_listeners);
 
     if (result == IOX2_OK) {
-        return iox::ok(number_of_notified_listeners);
+        return number_of_notified_listeners;
     }
 
-    return iox::err(iox::into<NotifierNotifyError>(result));
+    return bb::err(bb::into<NotifierNotifyError>(result));
 }
 
 template <ServiceType S>
-auto Notifier<S>::deadline() const -> iox::optional<iox::units::Duration> {
+auto Notifier<S>::deadline() const -> bb::Optional<iox2::bb::Duration> {
     uint64_t seconds = 0;
     uint32_t nanoseconds = 0;
 
     if (iox2_notifier_deadline(&m_handle, &seconds, &nanoseconds)) {
-        return { iox::units::Duration::fromSeconds(seconds) + iox::units::Duration::fromNanoseconds(nanoseconds) };
+        return { iox2::bb::Duration::from_secs(seconds) + iox2::bb::Duration::from_nanos(nanoseconds) };
     }
 
-    return iox::nullopt;
+    return bb::NULLOPT;
 }
 
 template <ServiceType S>

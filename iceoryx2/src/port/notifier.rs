@@ -35,19 +35,21 @@
 //! # }
 //! ```
 
-use core::{cell::UnsafeCell, sync::atomic::Ordering, time::Duration};
+use core::time::Duration;
 
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
 
+use iceoryx2_bb_concurrency::atomic::Ordering;
+use iceoryx2_bb_concurrency::cell::UnsafeCell;
 use iceoryx2_bb_elementary::CallbackProgression;
 use iceoryx2_bb_lock_free::mpmc::container::{ContainerHandle, ContainerState};
-use iceoryx2_bb_log::{debug, fail, warn};
 use iceoryx2_cal::{
     arc_sync_policy::ArcSyncPolicy, dynamic_storage::DynamicStorage, event::NotifierBuilder,
 };
 use iceoryx2_cal::{event::Event, named_concept::NamedConceptBuilder};
+use iceoryx2_log::{debug, fail, warn};
 
 use crate::{
     node::NodeId,
@@ -306,7 +308,10 @@ impl<Service: service::Service> Notifier<Service> {
             Self::new_without_auto_event_emission(service.clone(), default_event_id)?;
 
         let static_config = service.static_config.event();
-        new_self.on_drop_notification = static_config.notifier_dropped_event.map(EventId::new);
+        new_self.on_drop_notification = static_config
+            .notifier_dropped_event
+            .map(EventId::new)
+            .into();
 
         if let Some(event_id) = static_config.notifier_created_event() {
             match new_self.notify_with_custom_event_id(event_id) {
@@ -416,7 +421,8 @@ impl<Service: service::Service> Notifier<Service> {
             .static_config
             .event()
             .deadline
-            .map(|v| v.value)
+            .map(|v| v.value.into())
+            .into()
     }
 
     /// Notifies all [`crate::port::listener::Listener`] connected to the service with a custom
@@ -483,6 +489,7 @@ impl<Service: service::Service> Notifier<Service> {
             .static_config
             .event()
             .deadline
+            .as_option_ref()
         {
             let msg = "The notification was sent";
             let duration_since_creation = fail!(from self, when deadline.creation_time.elapsed(),
@@ -502,7 +509,7 @@ impl<Service: service::Service> Notifier<Service> {
                 duration_since_creation.as_nanos() as u64 - previous_duration_since_creation,
             );
 
-            if deadline.value < duration_since_last_notification {
+            if duration_since_last_notification > deadline.value.into() {
                 fail!(from self, with NotifierNotifyError::MissedDeadline,
                 "{} but the deadline was hit. The service requires a notification after {:?} but {:?} passed without a notification.",
                 msg, deadline.value, duration_since_last_notification);

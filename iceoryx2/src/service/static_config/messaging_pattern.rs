@@ -18,7 +18,7 @@ use crate::service::static_config::event;
 use crate::service::static_config::publish_subscribe;
 use iceoryx2_bb_derive_macros::ZeroCopySend;
 use iceoryx2_bb_elementary_traits::zero_copy_send::ZeroCopySend;
-use iceoryx2_bb_log::fatal_panic;
+use iceoryx2_log::fatal_panic;
 use serde::{Deserialize, Serialize};
 
 use super::request_response;
@@ -30,7 +30,7 @@ use super::request_response;
 ///
 /// This is a large struct (>1KB). Be cautious with where it is placed and how it is passed around.
 #[non_exhaustive]
-#[derive(Debug, Clone, Eq, Hash, PartialEq, ZeroCopySend, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, ZeroCopySend, Serialize, Deserialize)]
 #[repr(C)]
 #[allow(clippy::large_enum_variant)]
 pub enum MessagingPattern {

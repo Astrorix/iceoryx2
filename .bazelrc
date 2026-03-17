@@ -1,5 +1,6 @@
+common --enable_bzlmod
 build --enable_platform_specific_config
-build:linux --cxxopt="-std=c++17"
+build:linux --cxxopt="-std=c++14"
 build:windows --cxxopt="/std:c++17"
 
 # this has to be specified manually
@@ -16,12 +17,9 @@ test --test_output=streamed
 test --nocache_test_results
 test --action_env=RUST_TEST_THREADS=1
 
-build --@iceoryx//:feature_acl=off
-
 #
 # feature flags
 #
 
-# value [auto, on, off]
-# 'auto' is defined by the crate owner ('off' for this feature) and the default value if the flag is not set
+# value [on, off]
 #build --//:feature_dev_permissions=on

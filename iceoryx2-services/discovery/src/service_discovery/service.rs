@@ -32,8 +32,7 @@ use iceoryx2::{
         Service as ServiceType, ServiceDetails,
     },
 };
-
-use once_cell::sync::Lazy;
+use iceoryx2_bb_concurrency::lazy_lock::LazyLock;
 
 const SERVICE_NAME: &str = "discovery/services/";
 
@@ -527,7 +526,7 @@ impl<S: ServiceType> Service<S> {
 /// This function will panic during the first call if the service name is invalid,
 /// which should never happen with the predefined constants.
 pub fn service_name() -> &'static ServiceName {
-    static SERVICE_NAME_INSTANCE: Lazy<ServiceName> = Lazy::new(|| {
+    static SERVICE_NAME_INSTANCE: LazyLock<ServiceName> = LazyLock::new(|| {
         ServiceName::__internal_new_prefixed(SERVICE_NAME)
             .expect("shouldn't occur: invalid service name for service discovery service")
     });

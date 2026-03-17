@@ -20,6 +20,8 @@
 //! ## Handle Events
 //!
 //! ```
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_linux::epoll::*;
 //! use iceoryx2_bb_posix::socket_pair::StreamingSocket;
 //! use iceoryx2_bb_posix::file_descriptor::FileDescriptorBased;
@@ -54,11 +56,11 @@ extern crate alloc;
 use alloc::format;
 
 use core::mem::MaybeUninit;
-use core::sync::atomic::Ordering;
 use core::time::Duration;
+use iceoryx2_bb_concurrency::atomic::Ordering;
 
+use iceoryx2_bb_concurrency::atomic::AtomicUsize;
 use iceoryx2_bb_container::semantic_string::SemanticString;
-use iceoryx2_bb_log::{fail, warn};
 use iceoryx2_bb_posix::{
     file::{AccessMode, FileBuilder, FileOpenError, FileReadError},
     file_descriptor::{FileDescriptor, FileDescriptorBased},
@@ -66,7 +68,7 @@ use iceoryx2_bb_posix::{
     signal_set::FetchableSignalSet,
 };
 use iceoryx2_bb_system_types::file_path::FilePath;
-use iceoryx2_pal_concurrency_sync::iox_atomic::IoxAtomicUsize;
+use iceoryx2_log::{fail, warn};
 use iceoryx2_pal_os_api::linux;
 use iceoryx2_pal_posix::posix::{self};
 
@@ -220,7 +222,7 @@ pub struct EpollGuard<'epoll, 'file_descriptor> {
     fd: &'file_descriptor FileDescriptor,
 }
 
-impl<'epoll, 'file_descriptor> EpollGuard<'epoll, 'file_descriptor> {
+impl<'file_descriptor> EpollGuard<'_, 'file_descriptor> {
     /// Returns a reference of the attached [`FileDescriptor`]
     pub fn file_descriptor(&self) -> &'file_descriptor FileDescriptor {
         self.fd
@@ -314,7 +316,7 @@ impl EpollBuilder {
 
         if !self.has_enabled_signal_handling {
             return Ok(Epoll {
-                len: IoxAtomicUsize::new(0),
+                len: AtomicUsize::new(0),
                 epoll_fd,
                 signal_fd: None,
             });
@@ -366,7 +368,7 @@ impl EpollBuilder {
         Ok(Epoll {
             epoll_fd,
             signal_fd: Some(signal_fd),
-            len: IoxAtomicUsize::new(0),
+            len: AtomicUsize::new(0),
         })
     }
 }
@@ -420,7 +422,7 @@ impl FileDescriptorEvent<'_> {
 pub struct Epoll {
     epoll_fd: FileDescriptor,
     signal_fd: Option<SignalFd>,
-    len: IoxAtomicUsize,
+    len: AtomicUsize,
 }
 
 impl Epoll {
@@ -558,7 +560,7 @@ impl Epoll {
     ) -> Result<usize, EpollWaitError> {
         // the smallest time period epoll can wait is 1ms, to introduce some waiting for
         // smaller time periods we always round the timeout up to the next millisecond
-        let timeout_in_ms = (timeout.as_nanos() as f64 / 1_000_000.0f64).ceil() as i32;
+        let timeout_in_ms = timeout.as_nanos().div_ceil(1_000_000) as i32;
         self.wait_impl(timeout_in_ms, event_call)
     }
 

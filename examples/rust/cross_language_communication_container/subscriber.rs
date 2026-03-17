@@ -18,12 +18,12 @@ use alloc::boxed::Box;
 use iceoryx2::prelude::*;
 use iceoryx2_bb_container::string::*;
 use iceoryx2_bb_container::vector::*;
-use iceoryx2_bb_log::cout;
 
 const CYCLE_TIME: Duration = Duration::from_secs(1);
 
 fn main() -> Result<(), Box<dyn core::error::Error>> {
     set_log_level_from_env_or(LogLevel::Info);
+
     let node = NodeBuilder::new().create::<ipc::Service>()?;
 
     let service = node
@@ -39,11 +39,11 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
 
     let subscriber = service.subscriber_builder().create()?;
 
-    cout!("Subscriber ready to receive data!");
+    coutln!("Subscriber ready to receive data!");
 
     while node.wait(CYCLE_TIME).is_ok() {
         while let Some(sample) = subscriber.receive()? {
-            cout!(
+            coutln!(
                 "received: {:?}, user_header: {:?}",
                 *sample,
                 sample.user_header()
@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
         }
     }
 
-    cout!("exit");
+    coutln!("exit");
 
     Ok(())
 }

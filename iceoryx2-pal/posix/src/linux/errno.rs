@@ -14,7 +14,10 @@
 
 use crate::posix::types::*;
 use crate::ErrnoEnumGenerator;
+
 use core::{ffi::CStr, fmt::Display};
+
+use alloc::string::ToString;
 
 ErrnoEnumGenerator!(
   assign
@@ -139,22 +142,22 @@ ErrnoEnumGenerator!(
 
 impl Errno {
     pub fn get() -> Errno {
-        unsafe { *crate::internal::__errno_location() }.into()
+        unsafe { *libc::__errno_location() }.into()
     }
 
     pub fn set(value: Errno) {
-        unsafe { *crate::internal::__errno_location() = value as i32 };
+        unsafe { *libc::__errno_location() = value as i32 };
     }
 
     pub fn reset() {
-        unsafe { *crate::internal::__errno_location() = 0 };
+        unsafe { *libc::__errno_location() = 0 };
     }
 }
 
 pub unsafe fn strerror_r(errnum: int, buf: *mut c_char, buflen: size_t) -> int {
-    use core::sync::atomic::Ordering;
-    use iceoryx2_pal_concurrency_sync::iox_atomic::IoxAtomicBool;
-    static IS_LOCKED: IoxAtomicBool = IoxAtomicBool::new(false);
+    use iceoryx2_pal_concurrency_sync::atomic::AtomicBool;
+    use iceoryx2_pal_concurrency_sync::atomic::Ordering;
+    static IS_LOCKED: AtomicBool = AtomicBool::new(false);
 
     while IS_LOCKED
         .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
@@ -170,5 +173,5 @@ pub unsafe fn strerror_r(errnum: int, buf: *mut c_char, buflen: size_t) -> int {
 }
 
 pub unsafe fn strerror(errnum: int) -> *const c_char {
-    crate::internal::strerror(errnum)
+    libc::strerror(errnum)
 }

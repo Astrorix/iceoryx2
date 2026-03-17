@@ -32,23 +32,23 @@
 //! ```
 
 use core::any::TypeId;
-use core::cell::UnsafeCell;
 use core::fmt::Debug;
 use core::marker::PhantomData;
-use core::sync::atomic::Ordering;
 
+use iceoryx2_bb_concurrency::atomic::Ordering;
+use iceoryx2_bb_concurrency::cell::UnsafeCell;
 use iceoryx2_bb_container::slotmap::SlotMap;
 use iceoryx2_bb_container::vector::polymorphic_vec::*;
 use iceoryx2_bb_elementary::cyclic_tagger::CyclicTagger;
 use iceoryx2_bb_elementary::CallbackProgression;
 use iceoryx2_bb_elementary_traits::zero_copy_send::ZeroCopySend;
 use iceoryx2_bb_lock_free::mpmc::container::{ContainerHandle, ContainerState};
-use iceoryx2_bb_log::{fail, warn};
 use iceoryx2_bb_memory::heap_allocator::HeapAllocator;
 use iceoryx2_bb_posix::unique_system_id::UniqueSystemId;
 use iceoryx2_cal::arc_sync_policy::ArcSyncPolicy;
 use iceoryx2_cal::dynamic_storage::DynamicStorage;
 use iceoryx2_cal::zero_copy_connection::ChannelId;
+use iceoryx2_log::{fail, warn};
 
 use crate::port::update_connections::UpdateConnections;
 use crate::service::builder::CustomPayloadMarker;
@@ -203,7 +203,7 @@ impl<
                 .expect("Heap allocator provides memory."),
                 receiver_port_id: subscriber_id.value(),
                 service_state: service.clone(),
-                message_type_details: static_config.message_type_details.clone(),
+                message_type_details: static_config.message_type_details,
                 receiver_max_borrowed_samples: static_config.subscriber_max_borrowed_samples,
                 enable_safe_overflow: static_config.enable_safe_overflow,
                 buffer_size,

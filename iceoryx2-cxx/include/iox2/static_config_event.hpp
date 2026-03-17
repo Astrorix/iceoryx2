@@ -13,9 +13,9 @@
 #ifndef IOX2_STATIC_CONFIG_EVENT_HPP
 #define IOX2_STATIC_CONFIG_EVENT_HPP
 
-#include "iox/duration.hpp"
-#include "iox/optional.hpp"
 #include "iox2/attribute_set.hpp"
+#include "iox2/bb/duration.hpp"
+#include "iox2/bb/optional.hpp"
 #include "iox2/event_id.hpp"
 #include "iox2/iceoryx2.h"
 #include "iox2/internal/iceoryx2.hpp"
@@ -40,29 +40,32 @@ class StaticConfigEvent {
     auto event_id_max_value() const -> size_t;
 
     /// Returns the emitted [`EventId`] when a new notifier is created.
-    auto notifier_created_event() const -> iox::optional<EventId>;
+    auto notifier_created_event() const -> bb::Optional<EventId>;
 
     /// Returns the emitted [`EventId`] when a notifier is dropped.
-    auto notifier_dropped_event() const -> iox::optional<EventId>;
+    auto notifier_dropped_event() const -> bb::Optional<EventId>;
 
     /// Returns the emitted [`EventId`] when a notifier is identified as dead.
-    auto notifier_dead_event() const -> iox::optional<EventId>;
+    auto notifier_dead_event() const -> bb::Optional<EventId>;
 
     /// Returns the deadline of the service. If no new notification is signaled from any
     /// [`Notifier`] after the given deadline, it is rated
     /// as an error and all [`Listener`]s that are attached
     /// to a [`WaitSet`] are woken up and notified about the missed
     /// deadline.
-    auto deadline() const -> iox::optional<iox::units::Duration>;
+    auto deadline() const -> bb::Optional<iox2::bb::Duration>;
 
   private:
     template <ServiceType>
     friend class PortFactoryEvent;
+    friend class StaticConfig;
 
     explicit StaticConfigEvent(iox2_static_config_event_t value);
 
     iox2_static_config_event_t m_value;
 };
 } // namespace iox2
+
+auto operator<<(std::ostream& stream, const iox2::StaticConfigEvent& value) -> std::ostream&;
 
 #endif

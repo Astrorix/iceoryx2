@@ -24,13 +24,12 @@ use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
 
+use iceoryx2_bb_concurrency::lazy_lock::LazyLock;
 use iceoryx2_bb_lock_free::spsc::safely_overflowing_index_queue::*;
-use iceoryx2_bb_log::{fail, fatal_panic};
 use iceoryx2_bb_posix::mutex::*;
 use iceoryx2_bb_system_types::file_path::FilePath;
 use iceoryx2_bb_system_types::path::Path;
-
-use once_cell::sync::Lazy;
+use iceoryx2_log::{fail, fatal_panic};
 
 #[derive(Debug)]
 pub(crate) struct Management {
@@ -52,19 +51,17 @@ struct StorageEntry {
     content: Arc<Management>,
 }
 
-static PROCESS_LOCAL_MTX_HANDLE: Lazy<MutexHandle<BTreeMap<FilePath, StorageEntry>>> =
-    Lazy::new(MutexHandle::new);
-static PROCESS_LOCAL_CHANNELS: Lazy<Mutex<BTreeMap<FilePath, StorageEntry>>> = Lazy::new(|| {
-    let result = MutexBuilder::new()
-        .is_interprocess_capable(false)
-        .create(BTreeMap::new(), &PROCESS_LOCAL_MTX_HANDLE);
+static PROCESS_LOCAL_MTX_HANDLE: LazyLock<MutexHandle<BTreeMap<FilePath, StorageEntry>>> =
+    LazyLock::new(MutexHandle::new);
 
-    if result.is_err() {
-        fatal_panic!(from "PROCESS_LOCAL_CHANNELS", "Failed to create process global communication channels");
-    }
-
-    result.unwrap()
-});
+static PROCESS_LOCAL_CHANNELS: LazyLock<Mutex<'static, 'static, BTreeMap<FilePath, StorageEntry>>> =
+    LazyLock::new(|| {
+        fatal_panic!(from "PROCESS_LOCAL_CHANNELS",
+            when MutexBuilder::new()
+                .is_interprocess_capable(false)
+                .create(BTreeMap::new(), &PROCESS_LOCAL_MTX_HANDLE),
+            "Failed to create process global communication channels")
+    });
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Configuration {

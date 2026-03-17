@@ -20,7 +20,7 @@ include(Iceoryx2PlatformSettings)
 set(CMAKE_CXX_STANDARD ${ICEORYX2_CXX_STD_VALUE})
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(iceoryx2-cxx 0.7.0 REQUIRED)
+find_package(iceoryx2-cxx 0.8.999 REQUIRED)
 
 add_executable(component-tests_cxx)
 target_compile_options(component-tests_cxx
@@ -45,7 +45,7 @@ target_include_directories(component-tests_cxx
 target_link_libraries(component-tests_cxx
     PRIVATE
     iceoryx2-cxx::static-lib-cxx
-    iceoryx2-bb-cxx::iceoryx2-bb-containers-cxx
+    iceoryx2-bb-cxx::iceoryx2-bb-cxx
     ${ICEORYX2_SANITIZER_FLAGS}
     ${ICEORYX2_COVERAGE_FLAGS}
 )

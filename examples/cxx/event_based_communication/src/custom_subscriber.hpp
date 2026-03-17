@@ -31,9 +31,8 @@ class CustomSubscriber : public iox2::FileDescriptorBased {
     CustomSubscriber(CustomSubscriber&&) = default;
     ~CustomSubscriber() override {
         m_notifier
-            .notify_with_custom_event_id(
-                iox2::EventId(iox::from<PubSubEvent, size_t>(PubSubEvent::SubscriberDisconnected)))
-            .expect("");
+            .notify_with_custom_event_id(iox2::EventId(iox2::bb::into<size_t>(PubSubEvent::SubscriberDisconnected)))
+            .value();
     }
 
     auto operator=(const CustomSubscriber&) -> CustomSubscriber& = delete;
@@ -46,17 +45,15 @@ class CustomSubscriber : public iox2::FileDescriptorBased {
                                   .history_size(HISTORY_SIZE)
                                   .subscriber_max_buffer_size(HISTORY_SIZE)
                                   .open_or_create()
-                                  .expect("");
-        auto event_service = node.service_builder(service_name).event().open_or_create().expect("");
+                                  .value();
+        auto event_service = node.service_builder(service_name).event().open_or_create().value();
 
-        auto listener = event_service.listener_builder().create().expect("");
-        auto notifier = event_service.notifier_builder().create().expect("");
-        auto subscriber = pubsub_service.subscriber_builder().create().expect("");
+        auto listener = event_service.listener_builder().create().value();
+        auto notifier = event_service.notifier_builder().create().value();
+        auto subscriber = pubsub_service.subscriber_builder().create().value();
 
-        notifier
-            .notify_with_custom_event_id(
-                iox2::EventId(iox::from<PubSubEvent, size_t>(PubSubEvent::SubscriberConnected)))
-            .expect("");
+        notifier.notify_with_custom_event_id(iox2::EventId(iox2::bb::into<size_t>(PubSubEvent::SubscriberConnected)))
+            .value();
 
         return CustomSubscriber { std::move(subscriber), std::move(notifier), std::move(listener) };
     }
@@ -68,7 +65,7 @@ class CustomSubscriber : public iox2::FileDescriptorBased {
     void handle_event() {
         for (auto event = m_listener.try_wait_one(); event.has_value() && event->has_value();
              event = m_listener.try_wait_one()) {
-            switch (iox::from<size_t, PubSubEvent>(event.value()->as_value())) {
+            switch (iox2::bb::into<PubSubEvent>(event.value()->as_value())) {
             case PubSubEvent::SentHistory: {
                 std::cout << "History delivered" << std::endl;
                 for (auto sample = receive(); sample.has_value(); sample = receive()) {
@@ -97,12 +94,11 @@ class CustomSubscriber : public iox2::FileDescriptorBased {
         }
     }
 
-    auto receive() -> iox::optional<iox2::Sample<iox2::ServiceType::Ipc, TransmissionData, void>> {
-        auto sample = m_subscriber.receive().expect("");
+    auto receive() -> iox2::bb::Optional<iox2::Sample<iox2::ServiceType::Ipc, TransmissionData, void>> {
+        auto sample = m_subscriber.receive().value();
         if (sample.has_value()) {
-            m_notifier
-                .notify_with_custom_event_id(iox2::EventId(iox::from<PubSubEvent, size_t>(PubSubEvent::ReceivedSample)))
-                .expect("");
+            m_notifier.notify_with_custom_event_id(iox2::EventId(iox2::bb::into<size_t>(PubSubEvent::ReceivedSample)))
+                .value();
         }
 
         return sample;

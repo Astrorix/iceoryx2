@@ -18,7 +18,6 @@ use alloc::boxed::Box;
 use examples_common::PubSubEvent;
 use iceoryx2::node::NodeView;
 use iceoryx2::prelude::*;
-use iceoryx2_bb_log::cout;
 
 const CYCLE_TIME: Duration = Duration::from_millis(100);
 const DEADLINE_SERVICE_1: Duration = Duration::from_millis(1500);
@@ -26,6 +25,7 @@ const DEADLINE_SERVICE_2: Duration = Duration::from_millis(2000);
 
 fn main() -> Result<(), Box<dyn core::error::Error>> {
     set_log_level_from_env_or(LogLevel::Info);
+
     let service_name_1 = ServiceName::new("service_1")?;
     let service_name_2 = ServiceName::new("service_2")?;
 
@@ -78,7 +78,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
     let waitset = WaitSetBuilder::new().create::<ipc::Service>()?;
     let _cycle_guard = waitset.attach_interval(CYCLE_TIME);
 
-    cout!("Central daemon up and running.");
+    coutln!("Central daemon up and running.");
     waitset.wait_and_process(|_| {
         // The only task of our central daemon is it to monitor all running nodes and cleanup their
         // resources if a process has died.
@@ -96,7 +96,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
 fn find_and_cleanup_dead_nodes() {
     Node::<ipc::Service>::list(Config::global_config(), |node_state| {
         if let NodeState::Dead(state) = node_state {
-            cout!(
+            coutln!(
                 "detected dead node: {:?}",
                 state.details().as_ref().map(|v| v.name())
             );

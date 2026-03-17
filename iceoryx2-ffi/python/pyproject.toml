@@ -1,9 +1,9 @@
 [project]
 name = "iceoryx2"
-version = "0.7.0"
+version = "0.8.999"
 description = "Lock-Free Zero-Copy Inter-process Communication"
 readme = "README.md"
-requires-python = ">=3.11,<4.0"
+requires-python = ">=3.10,<4.0"
 license = "Apache-2.0 OR MIT"
 keywords = ["ipc", "inter-process communication", "zero-copy", "shared memory", "publish-subscribe", "request-response", "event"]
 authors = [
@@ -55,18 +55,18 @@ target-dir = "../../target/ff/python"
 packages = [{include = "iceoryx2", from = "python-src"}]
 
 [tool.poetry.dependencies]
-python = ">=3.11,<4.0"
+python = ">=3.10,<4.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.1"
 prospector = {extras = ["with_mypy"], version = "^1.17.2"}
-black = "^25.1.0"
+black = "^26.3.1"
 isort = "^6.0.1"
 bandit = "^1.8.6"
 maturin = "^1.9.1"
 twine = "^6.2.0"
 build = "^1.3.0"
-wheel = "^0.45.1"
+wheel = "^0.46.3"
 
 [tool.poetry.requires-plugins]
 poethepoet = { version = "~0.35.0", extras = ["poetry_plugin"]}
@@ -81,7 +81,13 @@ shell = "maturin develop --manifest-path Cargo.toml --target-dir ../../target/ff
 shell = "python -m build --sdist --outdir ../../target/ff/python/dist"
 
 [tool.poe.tasks.build-wheel]
-shell = "maturin build --release --target-dir ../../target/ff/python --out ../../target/ff/python/dist"
+shell = "maturin build --release ${interpreter:+-i $interpreter} --target-dir ../../target/ff/python --out ../../target/ff/python/dist"
+
+  [[tool.poe.tasks.build-wheel.args]]
+  name = "interpreter"
+  help = "Python interpreter to build for (e.g. python3.14t)"
+  default = ""
+  options = ["-i", "--interpreter"]
 
 [tool.poe.tasks.upload-dist]
 shell = "twine upload ${dist}/* -r ${repo}"

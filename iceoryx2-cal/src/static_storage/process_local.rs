@@ -16,6 +16,8 @@
 //! # Example
 //!
 //! ```
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_cal::static_storage::process_local::*;
 //! use iceoryx2_bb_system_types::file_name::FileName;
 //! use iceoryx2_bb_container::semantic_string::SemanticString;
@@ -41,19 +43,18 @@
 pub use crate::named_concept::*;
 pub use crate::static_storage::*;
 
-use core::sync::atomic::Ordering;
+use iceoryx2_bb_concurrency::atomic::Ordering;
 
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use iceoryx2_bb_log::{fail, fatal_panic};
+use iceoryx2_bb_concurrency::atomic::AtomicBool;
+use iceoryx2_bb_concurrency::lazy_lock::LazyLock;
 use iceoryx2_bb_posix::adaptive_wait::AdaptiveWaitBuilder;
 use iceoryx2_bb_posix::mutex::*;
-use iceoryx2_pal_concurrency_sync::iox_atomic::IoxAtomicBool;
-
-use once_cell::sync::Lazy;
+use iceoryx2_log::{fail, fatal_panic};
 
 #[derive(Debug)]
 struct StorageContent {
@@ -66,19 +67,17 @@ struct StorageEntry {
     content: Arc<StorageContent>,
 }
 
-static PROCESS_LOCAL_MTX_HANDLE: Lazy<MutexHandle<BTreeMap<FilePath, StorageEntry>>> =
-    Lazy::new(MutexHandle::new);
-static PROCESS_LOCAL_STORAGE: Lazy<Mutex<BTreeMap<FilePath, StorageEntry>>> = Lazy::new(|| {
-    let result = MutexBuilder::new()
-        .is_interprocess_capable(false)
-        .create(BTreeMap::new(), &PROCESS_LOCAL_MTX_HANDLE);
+static PROCESS_LOCAL_MTX_HANDLE: LazyLock<MutexHandle<BTreeMap<FilePath, StorageEntry>>> =
+    LazyLock::new(MutexHandle::new);
 
-    if result.is_err() {
-        fatal_panic!(from "PROCESS_LOCAL_STORAGE", "Failed to create global static storage");
-    }
-
-    result.unwrap()
-});
+static PROCESS_LOCAL_STORAGE: LazyLock<Mutex<'static, 'static, BTreeMap<FilePath, StorageEntry>>> =
+    LazyLock::new(|| {
+        fatal_panic!(from "PROCESS_LOCAL_STORAGE",
+            when MutexBuilder::new()
+                .is_interprocess_capable(false)
+                .create(BTreeMap::new(), &PROCESS_LOCAL_MTX_HANDLE),
+            "Failed to create global static storage")
+    });
 
 #[derive(Clone, Debug)]
 pub struct Configuration {
@@ -171,7 +170,7 @@ impl StaticStorageLocked<Storage> for Locked {
 #[derive(Debug)]
 pub struct Storage {
     name: FileName,
-    has_ownership: IoxAtomicBool,
+    has_ownership: AtomicBool,
     config: Configuration,
     content: Arc<StorageContent>,
 }
@@ -346,7 +345,7 @@ impl StaticStorageBuilder<Storage> for Builder {
             } else {
                 return Ok(Storage {
                     name: self.name,
-                    has_ownership: IoxAtomicBool::new(self.has_ownership),
+                    has_ownership: AtomicBool::new(self.has_ownership),
                     config: self.config,
                     content: entry.content.clone(),
                 });
@@ -383,7 +382,7 @@ impl StaticStorageBuilder<Storage> for Builder {
         Ok(Locked {
             storage: Storage {
                 name: self.name,
-                has_ownership: IoxAtomicBool::new(self.has_ownership),
+                has_ownership: AtomicBool::new(self.has_ownership),
                 config: self.config,
                 content,
             },

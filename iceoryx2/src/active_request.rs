@@ -40,19 +40,17 @@
 //! ```
 
 use alloc::sync::Arc;
-use core::{
-    any::TypeId, fmt::Debug, marker::PhantomData, mem::MaybeUninit, ops::Deref,
-    sync::atomic::Ordering,
-};
+use core::{any::TypeId, fmt::Debug, marker::PhantomData, mem::MaybeUninit, ops::Deref};
 
+use iceoryx2_bb_concurrency::atomic::AtomicUsize;
+use iceoryx2_bb_concurrency::atomic::Ordering;
 use iceoryx2_bb_elementary_traits::zero_copy_send::ZeroCopySend;
-use iceoryx2_bb_log::fail;
 use iceoryx2_bb_posix::unique_system_id::UniqueSystemId;
 use iceoryx2_cal::{
     arc_sync_policy::ArcSyncPolicy, shm_allocator::AllocationStrategy,
     zero_copy_connection::ChannelId,
 };
-use iceoryx2_pal_concurrency_sync::iox_atomic::IoxAtomicUsize;
+use iceoryx2_log::fail;
 
 use crate::{
     port::{
@@ -92,7 +90,7 @@ pub struct ActiveRequest<
         RequestPayload,
     >,
     pub(crate) shared_state: Service::ArcThreadSafetyPolicy<SharedServerState<Service>>,
-    pub(crate) shared_loan_counter: Arc<IoxAtomicUsize>,
+    pub(crate) shared_loan_counter: Arc<AtomicUsize>,
     pub(crate) max_loan_count: usize,
     pub(crate) details: ChunkDetails,
     pub(crate) request_id: u64,
@@ -319,6 +317,7 @@ impl<
         let user_header_ptr: *mut ResponseHeader = chunk.user_header.cast();
         unsafe {
             header_ptr.write(service::header::request_response::ResponseHeader {
+                node_id: *shared_state.response_sender.shared_node.id(),
                 server_id: UniqueServerId(UniqueSystemId::from(
                     shared_state.response_sender.sender_port_id,
                 )),
@@ -565,6 +564,7 @@ impl<
         let user_header_ptr: *mut ResponseHeader = chunk.user_header.cast();
         unsafe {
             header_ptr.write(service::header::request_response::ResponseHeader {
+                node_id: *shared_state.response_sender.shared_node.id(),
                 server_id: UniqueServerId(UniqueSystemId::from(
                     shared_state.response_sender.sender_port_id,
                 )),

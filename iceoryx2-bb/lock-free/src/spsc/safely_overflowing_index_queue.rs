@@ -17,6 +17,8 @@
 //! # Example
 //!
 //! ```
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_lock_free::spsc::safely_overflowing_index_queue::*;
 //!
 //! const QUEUE_CAPACITY: usize = 128;
@@ -43,16 +45,19 @@
 //! }
 //! ```
 
-use core::{alloc::Layout, cell::UnsafeCell, fmt::Debug, sync::atomic::Ordering};
+use core::{alloc::Layout, fmt::Debug};
+
+use iceoryx2_bb_concurrency::atomic::AtomicBool;
+use iceoryx2_bb_concurrency::atomic::AtomicU64;
+use iceoryx2_bb_concurrency::atomic::Ordering;
+use iceoryx2_bb_concurrency::cell::UnsafeCell;
 use iceoryx2_bb_elementary::math::unaligned_mem_size;
 use iceoryx2_bb_elementary::{bump_allocator::BumpAllocator, relocatable_ptr::RelocatablePointer};
 use iceoryx2_bb_elementary_traits::{
     owning_pointer::OwningPointer, pointer_trait::PointerTrait,
     relocatable_container::RelocatableContainer,
 };
-use iceoryx2_bb_log::{fail, fatal_panic};
-use iceoryx2_pal_concurrency_sync::iox_atomic::IoxAtomicBool;
-use iceoryx2_pal_concurrency_sync::iox_atomic::IoxAtomicU64;
+use iceoryx2_log::{fail, fatal_panic};
 
 /// The [`Producer`] of the [`SafelyOverflowingIndexQueue`]/[`FixedSizeSafelyOverflowingIndexQueue`]
 /// which can add values to it via [`Producer::push()`].
@@ -71,7 +76,12 @@ impl<PointerType: PointerTrait<UnsafeCell<u64>> + Debug> Producer<'_, PointerTyp
 
 impl<PointerType: PointerTrait<UnsafeCell<u64>>> Drop for Producer<'_, PointerType> {
     fn drop(&mut self) {
-        self.queue.has_producer.store(true, Ordering::Relaxed);
+        self.queue.has_producer.store(
+            true,
+            // SYNC POINT: producer
+            // sync the internal state with the next producer in another thread
+            Ordering::Release,
+        );
     }
 }
 
@@ -92,7 +102,12 @@ impl<PointerType: PointerTrait<UnsafeCell<u64>> + Debug> Consumer<'_, PointerTyp
 
 impl<PointerType: PointerTrait<UnsafeCell<u64>>> Drop for Consumer<'_, PointerType> {
     fn drop(&mut self) {
-        self.queue.has_consumer.store(true, Ordering::Relaxed);
+        self.queue.has_consumer.store(
+            true,
+            // SYNC POINT: consumer
+            // sync the internal state with the next consumer in another thread
+            Ordering::Release,
+        );
     }
 }
 
@@ -114,12 +129,12 @@ pub mod details {
     #[repr(C)]
     pub struct SafelyOverflowingIndexQueue<PointerType: PointerTrait<UnsafeCell<u64>>> {
         data_ptr: PointerType,
+        pub(super) has_producer: AtomicBool,
+        pub(super) has_consumer: AtomicBool,
+        is_memory_initialized: AtomicBool,
         capacity: usize,
-        write_position: IoxAtomicU64,
-        read_position: IoxAtomicU64,
-        pub(super) has_producer: IoxAtomicBool,
-        pub(super) has_consumer: IoxAtomicBool,
-        is_memory_initialized: IoxAtomicBool,
+        write_position: AtomicU64,
+        read_position: AtomicU64,
     }
 
     unsafe impl<PointerType: PointerTrait<UnsafeCell<u64>>> Sync
@@ -142,11 +157,11 @@ pub mod details {
             Self {
                 data_ptr,
                 capacity,
-                write_position: IoxAtomicU64::new(0),
-                read_position: IoxAtomicU64::new(0),
-                has_producer: IoxAtomicBool::new(true),
-                has_consumer: IoxAtomicBool::new(true),
-                is_memory_initialized: IoxAtomicBool::new(true),
+                write_position: AtomicU64::new(0),
+                read_position: AtomicU64::new(0),
+                has_producer: AtomicBool::new(true),
+                has_consumer: AtomicBool::new(true),
+                is_memory_initialized: AtomicBool::new(true),
             }
         }
     }
@@ -156,11 +171,11 @@ pub mod details {
             Self {
                 data_ptr: RelocatablePointer::new_uninit(),
                 capacity,
-                write_position: IoxAtomicU64::new(0),
-                read_position: IoxAtomicU64::new(0),
-                has_producer: IoxAtomicBool::new(true),
-                has_consumer: IoxAtomicBool::new(true),
-                is_memory_initialized: IoxAtomicBool::new(false),
+                write_position: AtomicU64::new(0),
+                read_position: AtomicU64::new(0),
+                has_producer: AtomicBool::new(true),
+                has_consumer: AtomicBool::new(true),
+                is_memory_initialized: AtomicBool::new(false),
             }
         }
 
@@ -222,6 +237,8 @@ pub mod details {
         /// it returns [`None`] since it is a single producer single consumer
         /// [`SafelyOverflowingIndexQueue`].
         /// ```
+        /// # extern crate iceoryx2_bb_loggers;
+        ///
         /// use iceoryx2_bb_lock_free::spsc::safely_overflowing_index_queue::*;
         ///
         /// const QUEUE_CAPACITY: usize = 128;
@@ -242,7 +259,10 @@ pub mod details {
             match self.has_producer.compare_exchange(
                 true,
                 false,
-                Ordering::Relaxed,
+                // SYNC POINT: producer
+                // sync the internal state with the next producer in another thread
+                Ordering::Acquire,
+                // the consumer could not be acquired therefore we do not need to sync anything
                 Ordering::Relaxed,
             ) {
                 Ok(_) => Some(Producer { queue: self }),
@@ -254,6 +274,8 @@ pub mod details {
         /// it returns [`None`] since it is a single producer single consumer
         /// [`SafelyOverflowingIndexQueue`].
         /// ```
+        /// # extern crate iceoryx2_bb_loggers;
+        ///
         /// use iceoryx2_bb_lock_free::spsc::safely_overflowing_index_queue::*;
         ///
         /// const QUEUE_CAPACITY: usize = 128;
@@ -274,7 +296,10 @@ pub mod details {
             match self.has_consumer.compare_exchange(
                 true,
                 false,
-                Ordering::Relaxed,
+                // SYNC POINT: consumer
+                // sync the internal state with the next consumer in another thread
+                Ordering::Acquire,
+                // the consumer could not be acquired therefore we do not need to sync anything
                 Ordering::Relaxed,
             ) {
                 Ok(_) => Some(Consumer { queue: self }),
@@ -438,7 +463,7 @@ impl<const CAPACITY: usize> FixedSizeSafelyOverflowingIndexQueue<CAPACITY> {
     pub fn new() -> Self {
         let mut new_self = Self {
             state: unsafe { RelocatableSafelyOverflowingIndexQueue::new_uninit(CAPACITY) },
-            data: core::array::from_fn(|_| UnsafeCell::new(0)),
+            data: [const { UnsafeCell::new(0) }; CAPACITY],
             data_plus_one: UnsafeCell::new(0),
         };
 

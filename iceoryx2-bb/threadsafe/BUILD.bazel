@@ -26,7 +26,7 @@ rust_library(
         "//iceoryx2-bb/container:iceoryx2-bb-container",
         "//iceoryx2-bb/elementary:iceoryx2-bb-elementary",
         "//iceoryx2-bb/elementary-traits:iceoryx2-bb-elementary-traits",
-        "//iceoryx2-bb/log:iceoryx2-bb-log",
+        "//iceoryx2-log/log:iceoryx2-log",
         "//iceoryx2-bb/posix:iceoryx2-bb-posix",
     ],
     proc_macro_deps = [
@@ -38,10 +38,10 @@ rust_test_suite(
     name = "iceoryx2-bb-threadsafe-tests",
     srcs = glob(["tests/**/*.rs"]),
     deps = [
-        ":iceoryx2-bb-threadsafe",
-        "//iceoryx2-bb/posix:iceoryx2-bb-posix",
+        "//iceoryx2-bb/threadsafe/tests-common:iceoryx2-bb-threadsafe-tests-common",
+        "//iceoryx2-bb/loggers:iceoryx2-bb-loggers",
         "//iceoryx2-bb/testing:iceoryx2-bb-testing",
-        "//iceoryx2-pal/testing:iceoryx2-pal-testing",
+        "//iceoryx2-pal/posix:iceoryx2-pal-posix",
     ],
     proc_macro_deps = [
         "@crate_index//:generic-tests",

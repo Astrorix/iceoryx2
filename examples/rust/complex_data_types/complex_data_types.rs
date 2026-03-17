@@ -17,7 +17,6 @@ use alloc::boxed::Box;
 
 use iceoryx2::prelude::*;
 use iceoryx2_bb_container::{queue::FixedSizeQueue, string::*, vector::*};
-use iceoryx2_bb_log::cout;
 
 // For both data types we derive from PlacementDefault to allow in memory initialization
 // without any copy. Avoids stack overflows when data type is larger than the available stack.
@@ -44,6 +43,7 @@ const CYCLE_TIME: Duration = Duration::from_secs(1);
 
 fn main() -> Result<(), Box<dyn core::error::Error>> {
     set_log_level_from_env_or(LogLevel::Info);
+
     let node = NodeBuilder::new().create::<ipc::Service>()?;
 
     let service = node
@@ -83,11 +83,11 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
             .push(StaticString::from_bytes(b"buh")?);
 
         sample.send()?;
-        cout!("{counter} :: send");
+        coutln!("{counter} :: send");
 
         // receive sample and print it
         while let Some(sample) = subscriber.receive()? {
-            cout!(
+            coutln!(
                 "{} :: received: {:?}",
                 counter,
                 sample.payload().plain_old_data

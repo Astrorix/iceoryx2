@@ -56,12 +56,12 @@ use alloc::format;
 use iceoryx2::prelude::{MessagingPattern, ServiceName};
 use iceoryx2::service::static_config::message_type_details::{TypeDetail, TypeVariant};
 use iceoryx2_bb_elementary::package_version::PackageVersion;
-use iceoryx2_bb_log::fail;
 use iceoryx2_bb_posix::file::{CreationMode, FileCreationError, FileWriteError};
 use iceoryx2_bb_posix::file::{File, FileBuilder};
 use iceoryx2_bb_system_types::file_path::FilePath;
 use iceoryx2_cal::serialize::toml::Toml;
 use iceoryx2_cal::serialize::Serialize;
+use iceoryx2_log::fail;
 
 use crate::record::RecordWriter;
 use crate::record::HEX_START_RECORD_MARKER;
@@ -183,7 +183,7 @@ impl RecorderBuilder {
         };
 
         let header = RecordHeader {
-            service_name: service_name.clone(),
+            service_name: *service_name,
             iceoryx2_version: PackageVersion::get().into(),
             details: RecordHeaderDetails {
                 file_format_version: match self.data_representation {

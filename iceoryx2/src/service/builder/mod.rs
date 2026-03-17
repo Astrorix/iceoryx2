@@ -37,9 +37,6 @@ use alloc::vec;
 use iceoryx2_bb_derive_macros::ZeroCopySend;
 use iceoryx2_bb_elementary::enum_gen;
 use iceoryx2_bb_elementary_traits::zero_copy_send::ZeroCopySend;
-use iceoryx2_bb_log::fail;
-use iceoryx2_bb_log::fatal_panic;
-use iceoryx2_bb_log::warn;
 use iceoryx2_bb_memory::bump_allocator::BumpAllocator;
 use iceoryx2_cal::dynamic_storage::DynamicStorageCreateError;
 use iceoryx2_cal::dynamic_storage::DynamicStorageOpenError;
@@ -50,6 +47,9 @@ use iceoryx2_cal::named_concept::NamedConceptMgmt;
 use iceoryx2_cal::named_concept::NamedConceptRemoveError;
 use iceoryx2_cal::serialize::Serialize;
 use iceoryx2_cal::static_storage::*;
+use iceoryx2_log::fail;
+use iceoryx2_log::fatal_panic;
+use iceoryx2_log::warn;
 
 use crate::node::SharedNode;
 use crate::service;
@@ -98,14 +98,6 @@ enum_gen! {
     DynamicStorageOpenError
 }
 
-impl core::fmt::Display for OpenDynamicStorageFailure {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "OpenDynamicStorageFailure::{self:?}")
-    }
-}
-
-impl core::error::Error for OpenDynamicStorageFailure {}
-
 enum_gen! {
 #[doc(hidden)]
     ReadStaticStorageFailure
@@ -113,14 +105,6 @@ enum_gen! {
     StaticStorageOpenError,
     StaticStorageReadError
 }
-
-impl core::fmt::Display for ReadStaticStorageFailure {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "ReadStaticStorageFailure::{self:?}")
-    }
-}
-
-impl core::error::Error for ReadStaticStorageFailure {}
 
 /// Builder to create or open [`Service`]s
 ///
@@ -137,7 +121,7 @@ pub struct Builder<S: Service> {
 impl<S: Service> Builder<S> {
     pub(crate) fn new(name: &ServiceName, shared_node: Arc<SharedNode<S>>) -> Self {
         Self {
-            name: name.clone(),
+            name: *name,
             shared_node,
             _phantom_s: PhantomData,
         }

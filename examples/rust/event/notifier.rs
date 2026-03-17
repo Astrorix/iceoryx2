@@ -13,12 +13,12 @@
 use core::time::Duration;
 
 use iceoryx2::prelude::*;
-use iceoryx2_bb_log::cout;
 
 const CYCLE_TIME: Duration = Duration::from_secs(1);
 
 fn main() -> Result<(), Box<dyn core::error::Error>> {
     set_log_level_from_env_or(LogLevel::Info);
+
     let node = NodeBuilder::new().create::<ipc::Service>()?;
 
     let event = node
@@ -34,10 +34,10 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
         counter += 1;
         notifier.notify_with_custom_event_id(EventId::new(counter % max_event_id))?;
 
-        cout!("Trigger event with id {counter} ...");
+        coutln!("Trigger event with id {counter} ...");
     }
 
-    cout!("exit");
+    coutln!("exit");
 
     Ok(())
 }

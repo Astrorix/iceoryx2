@@ -27,23 +27,23 @@ use core::time::Duration;
 use iceoryx2_bb_derive_macros::ZeroCopySend;
 use iceoryx2_bb_elementary::enum_gen;
 use iceoryx2_bb_elementary_traits::zero_copy_send::ZeroCopySend;
-use iceoryx2_bb_log::fail;
+use iceoryx2_log::fail;
 use iceoryx2_pal_posix::posix::errno::Errno;
 use iceoryx2_pal_posix::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum TimeError {
+enum_gen! { TimeError
+  entry:
     ClockTypeIsNotSupported,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum NanosleepError {
+enum_gen! { NanosleepError
+  entry:
     InterruptedBySignal(Duration),
     DurationOutOfRange,
     ClockTypeIsNotSupported,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
 enum_gen! {
@@ -137,6 +137,8 @@ impl AsTimeval for Duration {
 ///
 /// # Examples
 /// ```
+/// # extern crate iceoryx2_bb_loggers;
+///
 /// use iceoryx2_bb_posix::clock::*;
 /// let my_time = TimeBuilder::new().clock_type(ClockType::Realtime)
 ///                                 .seconds(123)
@@ -183,6 +185,44 @@ impl TimeBuilder {
     }
 }
 
+/// A intermediate [`Duration`] representation with a fixed memory layout which
+/// is shared memory compatible.
+#[repr(C)]
+#[derive(
+    Default, Clone, Copy, Eq, PartialEq, Hash, Debug, ZeroCopySend, Serialize, Deserialize,
+)]
+pub struct RelocatableDuration {
+    seconds: u64,
+    nanoseconds: u32,
+}
+
+impl RelocatableDuration {
+    /// Returns the [`RelocatableDuration`] in seconds
+    pub fn as_secs(&self) -> u64 {
+        self.seconds
+    }
+
+    /// Returns the fractional part of the seconds in nanoseconds.
+    pub fn subsec_nanos(&self) -> u32 {
+        self.nanoseconds
+    }
+}
+
+impl From<Duration> for RelocatableDuration {
+    fn from(value: Duration) -> Self {
+        Self {
+            seconds: value.as_secs(),
+            nanoseconds: value.subsec_nanos(),
+        }
+    }
+}
+
+impl From<RelocatableDuration> for Duration {
+    fn from(value: RelocatableDuration) -> Self {
+        Duration::from_secs(value.seconds) + Duration::from_nanos(value.nanoseconds as u64)
+    }
+}
+
 /// Represents time under a specified [`ClockType`]
 #[repr(C)]
 #[derive(
@@ -199,6 +239,8 @@ impl Time {
     ///
     /// # Examples
     /// ```ignore
+    /// # extern crate iceoryx2_bb_loggers;
+    ///
     /// use iceoryx2_bb_posix::clock::*;
     ///
     /// let now: Time = Time::now_with_clock(ClockType::Monotonic).unwrap();
@@ -228,6 +270,8 @@ impl Time {
     ///
     /// # Examples
     /// ```
+    /// # extern crate iceoryx2_bb_loggers;
+    ///
     /// use iceoryx2_bb_posix::clock::*;
     /// use core::time::Duration;
     ///
@@ -276,6 +320,8 @@ impl AsTimespec for Time {
 ///
 /// # Examples
 /// ```
+/// # extern crate iceoryx2_bb_loggers;
+///
 /// use iceoryx2_bb_posix::clock::*;
 /// use core::time::Duration;
 ///
@@ -299,6 +345,8 @@ pub fn nanosleep(duration: Duration) -> Result<(), NanosleepError> {
 ///
 /// # Examples
 /// ```
+/// # extern crate iceoryx2_bb_loggers;
+///
 /// use iceoryx2_bb_posix::clock::*;
 /// use core::time::Duration;
 ///

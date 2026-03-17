@@ -12,25 +12,26 @@
 
 #include "iox2/config.hpp"
 
+#include "iox2/bb/optional.hpp"
 #include "test.hpp"
 
 namespace {
 using namespace iox2;
 
 TEST(Config, global_prefix) {
-    const auto test_value = iox::FileName::create("oh_my_dot").expect("");
+    const auto test_value = iox2::bb::FileName::create("oh_my_dot").value();
     auto config = Config();
 
     config.global().set_prefix(test_value);
-    ASSERT_THAT(config.global().prefix(), StrEq(test_value.as_string().c_str()));
+    ASSERT_THAT(config.global().prefix(), StrEq(test_value.as_string().unchecked_access().c_str()));
 }
 
 TEST(Config, global_root_path) {
-    const auto test_value = iox::Path::create("some_path").expect("");
+    const auto test_value = iox2::bb::Path::create("some_path").value();
     auto config = Config();
 
     config.global().set_root_path(test_value);
-    ASSERT_THAT(config.global().root_path(), StrEq(test_value.as_string().c_str()));
+    ASSERT_THAT(config.global().root_path(), StrEq(test_value.as_string().unchecked_access().c_str()));
 }
 
 TEST(Config, defaults_event_max_listeners) {
@@ -42,36 +43,36 @@ TEST(Config, defaults_event_max_listeners) {
 }
 
 TEST(Config, defaults_event_notifier_created_event) {
-    const auto test_value = iox::optional<size_t>(12);
+    const auto test_value = bb::Optional<size_t>(12U);
     auto config = Config();
 
     config.defaults().event().set_notifier_created_event(test_value);
     ASSERT_THAT(config.defaults().event().notifier_created_event(), Eq(test_value));
 
-    config.defaults().event().set_notifier_created_event(iox::nullopt);
-    ASSERT_THAT(config.defaults().event().notifier_created_event(), Eq(iox::nullopt));
+    config.defaults().event().set_notifier_created_event(bb::NULLOPT);
+    ASSERT_THAT(config.defaults().event().notifier_created_event(), Eq(bb::NULLOPT));
 }
 
 TEST(Config, defaults_event_notifier_dropped_event) {
-    const auto test_value = iox::optional<size_t>(13);
+    const auto test_value = bb::Optional<size_t>(13U);
     auto config = Config();
 
     config.defaults().event().set_notifier_dropped_event(test_value);
     ASSERT_THAT(config.defaults().event().notifier_dropped_event(), Eq(test_value));
 
-    config.defaults().event().set_notifier_dropped_event(iox::nullopt);
-    ASSERT_THAT(config.defaults().event().notifier_dropped_event(), Eq(iox::nullopt));
+    config.defaults().event().set_notifier_dropped_event(bb::NULLOPT);
+    ASSERT_THAT(config.defaults().event().notifier_dropped_event(), Eq(bb::NULLOPT));
 }
 
 TEST(Config, defaults_event_notifier_dead_event) {
-    const auto test_value = iox::optional<size_t>(14);
+    const auto test_value = bb::Optional<size_t>(14U);
     auto config = Config();
 
     config.defaults().event().set_notifier_dead_event(test_value);
     ASSERT_THAT(config.defaults().event().notifier_dead_event(), Eq(test_value));
 
-    config.defaults().event().set_notifier_dead_event(iox::nullopt);
-    ASSERT_THAT(config.defaults().event().notifier_dead_event(), Eq(iox::nullopt));
+    config.defaults().event().set_notifier_dead_event(bb::NULLOPT);
+    ASSERT_THAT(config.defaults().event().notifier_dead_event(), Eq(bb::NULLOPT));
 }
 
 TEST(Config, defaults_event_max_notifiers) {
@@ -182,39 +183,42 @@ TEST(Config, defaults_publish_subscribe_subscriber_expired_connection_buffer) {
 }
 
 TEST(Config, global_service_directory) {
-    const auto test_value = iox::Path::create("look/there/flies/a/dead/pidgin").expect("");
+    const auto test_value = iox2::bb::Path::create("look/there/flies/a/dead/pidgin").value();
     auto config = Config();
 
     config.global().service().set_directory(test_value);
-    ASSERT_THAT(config.global().service().directory(), StrEq(test_value.as_string().c_str()));
+    ASSERT_THAT(config.global().service().directory(), StrEq(test_value.as_string().unchecked_access().c_str()));
 }
 
 TEST(Config, global_service_data_segment_suffix) {
-    const auto test_value = iox::FileName::create("no_touchy_fishy").expect("");
+    const auto test_value = iox2::bb::FileName::create("no_touchy_fishy").value();
     auto config = Config();
 
     config.global().service().set_data_segment_suffix(test_value);
-    ASSERT_THAT(config.global().service().data_segment_suffix(), StrEq(test_value.as_string().c_str()));
+    ASSERT_THAT(config.global().service().data_segment_suffix(),
+                StrEq(test_value.as_string().unchecked_access().c_str()));
 }
 
 TEST(Config, global_service_static_config_storage_suffix) {
-    const auto test_value = iox::FileName::create("its_a_smelly_fishy").expect("");
+    const auto test_value = iox2::bb::FileName::create("its_a_smelly_fishy").value();
     auto config = Config();
 
     config.global().service().set_static_config_storage_suffix(test_value);
-    ASSERT_THAT(config.global().service().static_config_storage_suffix(), StrEq(test_value.as_string().c_str()));
+    ASSERT_THAT(config.global().service().static_config_storage_suffix(),
+                StrEq(test_value.as_string().unchecked_access().c_str()));
 }
 
 TEST(Config, global_service_dynamic_config_storage_suffix) {
-    const auto test_value = iox::FileName::create("nala_runs_while_dreaming").expect("");
+    const auto test_value = iox2::bb::FileName::create("nala_runs_while_dreaming").value();
     auto config = Config();
 
     config.global().service().set_dynamic_config_storage_suffix(test_value);
-    ASSERT_THAT(config.global().service().dynamic_config_storage_suffix(), StrEq(test_value.as_string().c_str()));
+    ASSERT_THAT(config.global().service().dynamic_config_storage_suffix(),
+                StrEq(test_value.as_string().unchecked_access().c_str()));
 }
 
 TEST(Config, global_service_creation_timeout) {
-    const auto test_value = iox::units::Duration::fromSeconds(1234);
+    const auto test_value = iox2::bb::Duration::from_secs(1234);
     auto config = Config();
 
     config.global().service().set_creation_timeout(test_value);
@@ -222,51 +226,54 @@ TEST(Config, global_service_creation_timeout) {
 }
 
 TEST(Config, global_service_connection_suffix) {
-    const auto test_value = iox::FileName::create("what_dinosaur_ancester_has_the_pidgin").expect("");
+    const auto test_value = iox2::bb::FileName::create("what_dinosaur_ancester_has_the_pidgin").value();
     auto config = Config();
 
     config.global().service().set_connection_suffix(test_value);
-    ASSERT_THAT(config.global().service().connection_suffix(), StrEq(test_value.as_string().c_str()));
+    ASSERT_THAT(config.global().service().connection_suffix(),
+                StrEq(test_value.as_string().unchecked_access().c_str()));
 }
 
 TEST(Config, global_service_event_connection_suffix) {
-    const auto test_value = iox::FileName::create("dont_eat_elephants").expect("");
+    const auto test_value = iox2::bb::FileName::create("dont_eat_elephants").value();
     auto config = Config();
 
     config.global().service().set_event_connection_suffix(test_value);
-    ASSERT_THAT(config.global().service().event_connection_suffix(), StrEq(test_value.as_string().c_str()));
+    ASSERT_THAT(config.global().service().event_connection_suffix(),
+                StrEq(test_value.as_string().unchecked_access().c_str()));
 }
 
 TEST(Config, global_node_directory) {
-    const auto test_value = iox::Path::create("eat/the/carrototier").expect("");
+    const auto test_value = iox2::bb::Path::create("eat/the/carrototier").value();
     auto config = Config();
 
     config.global().node().set_directory(test_value);
-    ASSERT_THAT(config.global().node().directory(), StrEq(test_value.as_string().c_str()));
+    ASSERT_THAT(config.global().node().directory(), StrEq(test_value.as_string().unchecked_access().c_str()));
 }
 
 TEST(Config, global_node_monitor_suffix) {
-    const auto test_value = iox::FileName::create("why_i_am_so_happy_so_happy_oh_so_blurpy").expect("");
+    const auto test_value = iox2::bb::FileName::create("why_i_am_so_happy_so_happy_oh_so_blurpy").value();
     auto config = Config();
 
     config.global().node().set_monitor_suffix(test_value);
-    ASSERT_THAT(config.global().node().monitor_suffix(), StrEq(test_value.as_string().c_str()));
+    ASSERT_THAT(config.global().node().monitor_suffix(), StrEq(test_value.as_string().unchecked_access().c_str()));
 }
 
 TEST(Config, global_node_static_config_suffix) {
-    const auto test_value = iox::FileName::create("spin_me_like_a_vinyl_record").expect("");
+    const auto test_value = iox2::bb::FileName::create("spin_me_like_a_vinyl_record").value();
     auto config = Config();
 
     config.global().node().set_static_config_suffix(test_value);
-    ASSERT_THAT(config.global().node().static_config_suffix(), StrEq(test_value.as_string().c_str()));
+    ASSERT_THAT(config.global().node().static_config_suffix(),
+                StrEq(test_value.as_string().unchecked_access().c_str()));
 }
 
 TEST(Config, global_node_service_tag_suffix) {
-    const auto test_value = iox::FileName::create("who_is_fluffy").expect("");
+    const auto test_value = iox2::bb::FileName::create("who_is_fluffy").value();
     auto config = Config();
 
     config.global().node().set_service_tag_suffix(test_value);
-    ASSERT_THAT(config.global().node().service_tag_suffix(), StrEq(test_value.as_string().c_str()));
+    ASSERT_THAT(config.global().node().service_tag_suffix(), StrEq(test_value.as_string().unchecked_access().c_str()));
 }
 
 TEST(Config, global_node_cleanup_dead_nodes_on_creation) {

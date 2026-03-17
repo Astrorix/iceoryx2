@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+#![no_std]
 #![warn(clippy::alloc_instead_of_core)]
 #![warn(clippy::std_instead_of_alloc)]
 #![warn(clippy::std_instead_of_core)]
@@ -38,6 +39,8 @@
 //! zero copy inter-process communication.
 //!
 //! ```
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_container::string::*;
 //! use iceoryx2_bb_container::vector::*;
 //!
@@ -71,6 +74,8 @@
 //! ensure that required memory is always available.
 //!
 //! ```
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_container::queue::*;
 //!
 //! const QUEUE_CAPACITY: usize = 123;
@@ -90,7 +95,7 @@
 
 extern crate alloc;
 
-/// A queue similar to [`std::collections::VecDeque`]
+/// A queue similar to [`alloc::collections::vec_deque::VecDeque`]
 pub mod queue;
 /// A container with persistent unique keys to access values.
 pub mod slotmap;
@@ -104,6 +109,10 @@ pub mod flatmap;
 
 /// A trait that defines the interface of a string and several string variants.
 pub mod string;
+
+/// Implementation of an [`Option`] that has a stable memory layout and is
+/// shared memory compatible.
+pub mod relocatable_option;
 
 #[doc(hidden)]
 pub(crate) mod vec;

@@ -16,17 +16,17 @@ extern crate alloc;
 use alloc::boxed::Box;
 
 use iceoryx2::{prelude::*, service::static_config::StaticConfig};
-use iceoryx2_bb_log::cout;
 use iceoryx2_services_discovery::service_discovery::service_name;
 
 const CYCLE_TIME: Duration = Duration::from_millis(10);
 
 fn main() -> Result<(), Box<dyn core::error::Error>> {
     set_log_level_from_env_or(LogLevel::Info);
+
     let node = NodeBuilder::new().create::<ipc::Service>()?;
 
     let service = node
-        .service_builder(service_name().try_into()?)
+        .service_builder(service_name())
         .request_response::<(), [StaticConfig]>()
         .open_or_create()?;
 
@@ -41,10 +41,10 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
         if attachment_id.has_event_from(&guard) {
             while let Some(response) = pending_response.receive().unwrap() {
                 for service in response.payload().iter() {
-                    cout!("Service ID: {:?}", service.service_id().as_str());
-                    cout!("Service Name: {:?}", service.name().as_str());
+                    coutln!("Service ID: {:?}", service.service_id().as_str());
+                    coutln!("Service Name: {:?}", service.name().as_str());
                 }
-                cout!("exit");
+                coutln!("exit");
                 return CallbackProgression::Stop;
             }
         }

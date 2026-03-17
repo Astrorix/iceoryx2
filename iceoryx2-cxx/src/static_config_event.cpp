@@ -33,37 +33,52 @@ auto StaticConfigEvent::event_id_max_value() const -> size_t {
     return m_value.event_id_max_value;
 }
 
-auto StaticConfigEvent::notifier_created_event() const -> iox::optional<EventId> {
+auto StaticConfigEvent::notifier_created_event() const -> bb::Optional<EventId> {
     if (!m_value.has_notifier_created_event) {
-        return iox::nullopt;
+        return bb::NULLOPT;
     }
 
     return { EventId(m_value.notifier_created_event) };
 }
 
-auto StaticConfigEvent::notifier_dropped_event() const -> iox::optional<EventId> {
+auto StaticConfigEvent::notifier_dropped_event() const -> bb::Optional<EventId> {
     if (!m_value.has_notifier_dropped_event) {
-        return iox::nullopt;
+        return bb::NULLOPT;
     }
 
     return { EventId(m_value.notifier_dropped_event) };
 }
 
-auto StaticConfigEvent::notifier_dead_event() const -> iox::optional<EventId> {
+auto StaticConfigEvent::notifier_dead_event() const -> bb::Optional<EventId> {
     if (!m_value.has_notifier_dead_event) {
-        return iox::nullopt;
+        return bb::NULLOPT;
     }
 
     return { EventId(m_value.notifier_dead_event) };
 }
 
-auto StaticConfigEvent::deadline() const -> iox::optional<iox::units::Duration> {
+auto StaticConfigEvent::deadline() const -> bb::Optional<iox2::bb::Duration> {
     if (!m_value.has_deadline) {
-        return iox::nullopt;
+        return bb::NULLOPT;
     }
 
-    return { iox::units::Duration::fromSeconds(m_value.deadline_seconds)
-             + iox::units::Duration::fromNanoseconds(m_value.deadline_nanoseconds) };
+    return { iox2::bb::Duration::from_secs(m_value.deadline_seconds)
+             + iox2::bb::Duration::from_nanos(m_value.deadline_nanoseconds) };
 }
 
 } // namespace iox2
+
+auto operator<<(std::ostream& stream, const iox2::StaticConfigEvent& value) -> std::ostream& {
+    stream << "StaticConfigEvent { max_nodes: " << value.max_nodes() << ", max_notifiers: " << value.max_notifiers()
+           << ", max_listeners: " << value.max_listeners() << ", event_id_max_value: " << value.event_id_max_value()
+           << ", notifier_created_event: ";
+    stream_operator(stream, value.notifier_created_event());
+    stream << ", notifier_dropped_event: ";
+    stream_operator(stream, value.notifier_dropped_event());
+    stream << ", notifier_dead_event: ";
+    stream_operator(stream, value.notifier_dead_event());
+    stream << ", deadline: ";
+    stream_operator(stream, value.deadline());
+    stream << " }";
+    return stream;
+}

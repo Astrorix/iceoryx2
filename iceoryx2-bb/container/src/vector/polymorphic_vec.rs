@@ -15,6 +15,8 @@
 //! # Example
 //!
 //! ```no_run
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_elementary_traits::allocator::*;
 //! use iceoryx2_bb_container::vector::*;
 //!
@@ -60,7 +62,7 @@ use core::{
 };
 
 use iceoryx2_bb_elementary_traits::allocator::{AllocationError, BaseAllocator};
-use iceoryx2_bb_log::fail;
+use iceoryx2_log::fail;
 
 use crate::vector::internal;
 pub use crate::vector::Vector;
@@ -187,7 +189,7 @@ impl<'a, T, Allocator: BaseAllocator> PolymorphicVec<'a, T, Allocator> {
     }
 }
 
-impl<'a, T: Clone, Allocator: BaseAllocator> PolymorphicVec<'a, T, Allocator> {
+impl<T: Clone, Allocator: BaseAllocator> PolymorphicVec<'_, T, Allocator> {
     /// Same as clone but it can fail when the required memory could not be
     /// allocated from the [`BaseAllocator`].
     pub fn try_clone(&self) -> Result<Self, AllocationError> {

@@ -10,37 +10,29 @@
     NOTE: Add new entries sorted by issue number to minimize the possibility of
     conflicts when merging.
 -->
-* Android proof of concept with `local` communication
-  [#416](https://github.com/eclipse-iceoryx/iceoryx2/issues/416)
-* C, C++, and Python language bindings for blackboard
-  [#817](https://github.com/eclipse-iceoryx/iceoryx2/issues/817)
-* `iox2 config explain` cli command for config descriptions
-  [#832](https://github.com/eclipse-iceoryx/iceoryx2/issues/832)
-* Add traits to facilitate implementation of custom tunnelling mechanisms
-  [#845](https://github.com/eclipse-iceoryx/iceoryx2/issues/845)
-* Add a C++ string container type with fixed compile-time capacity
-  [#938](https://github.com/eclipse-iceoryx/iceoryx2/issues/938)
-* Add a C++ vector container type with fixed compile-time capacity
-  [#951](https://github.com/eclipse-iceoryx/iceoryx2/issues/951)
-* Use `epoll` instead of `select` for the `WaitSet` on Linux
-  [#961](https://github.com/eclipse-iceoryx/iceoryx2/issues/961)
-* Add a Rust vector type with fixed compile-time capacity which has the same
-  memory layout as the C++ vector
-  [#1073](https://github.com/eclipse-iceoryx/iceoryx2/issues/1073)
-* Add a Rust string type with fixed compile-time capacity which has the same
-  memory layout as the C++ vector
-  [#1075](https://github.com/eclipse-iceoryx/iceoryx2/issues/1075)
-* Add unchecked, compile time const creation functions to `SemanticString` and
-  system types like, `FileName`, `Path`, `FilePath`, ...
-  [#1109](https://github.com/eclipse-iceoryx/iceoryx2/issues/1109)
-* Add conformance test suite to be able to test out-of-tree extensions
-  [#1021](https://github.com/eclipse-iceoryx/iceoryx2/issues/1021)
-* Implement `Copy` for `StaticString`, `SemanticString` and system types
-  [#1114](https://github.com/eclipse-iceoryx/iceoryx2/issues/1114)
-* Support `unions` with `ZeroCopySend`
-  [#1144](https://github.com/eclipse-iceoryx/iceoryx2/issues/1144)
-* Add option to provide custom `iceoryx2-pal-configuration`
-  [#1176](https://github.com/eclipse-iceoryx/iceoryx2/issues/1176)
+
+* Allow `dyn` types as `WaitSet` attachments
+  [#1285](https://github.com/eclipse-iceoryx/iceoryx2/issues/1285)
+* Propagate user headers in publish-subscribe samples in the reference tunnel
+  implementation
+  [#1289](https://github.com/eclipse-iceoryx/iceoryx2/issues/1289)
+* Add source `NodeId` to request and response header
+  [#1308](https://github.com/eclipse-iceoryx/iceoryx2/issues/1308)
+* Introduce `RelocatableOption` and `RelocatableDuration` which are
+  `ZeroCopySend`
+  [#1312](https://github.com/eclipse-iceoryx/iceoryx2/issues/1312)
+* Enable users to pull in iceoryx2 as a Bazel module/dependency
+  [#1263](https://github.com/eclipse-iceoryx/iceoryx2/issues/1263)
+* Add missing C++ APIs to access messaging pattern specific static config
+  [#1353](https://github.com/eclipse-iceoryx/iceoryx2/issues/1353)
+* Implement `core::error::Error` for `bb::posix` error enums
+  [#1362](https://github.com/eclipse-iceoryx/iceoryx2/issues/1362)
+* Add `thread_scope` as `std::thread::scope` counterpart
+  [#1373](https://github.com/eclipse-iceoryx/iceoryx2/issues/1373)
+* Add minimal Python event-based communication example and end-to-end test
+  [#1376](https://github.com/eclipse-iceoryx/iceoryx2/issues/1376)
+* Add `iox2 service hz` command with rolling-rate statistics and timeout support
+  [#1383](https://github.com/eclipse-iceoryx/iceoryx2/issues/1383)
 
 ### Bugfixes
 
@@ -49,21 +41,32 @@
     conflicts when merging.
 -->
 
-* Remove duplicate entries in `iox2` command search path to prevent discovered
-  commands from being listed multiple times
-    [#1045](https://github.com/eclipse-iceoryx/iceoryx2/issues/1045)
-* LocalService in C language binding uses IPC configuration
-    [#1059](https://github.com/eclipse-iceoryx/iceoryx2/issues/1059)
-* Trait `std::fmt::Debug` is not implemented for `sigset_t` in libc
-    [#1087](https://github.com/eclipse-iceoryx/iceoryx2/issues/1087)
-* Use `IOX2_SERVICE_NAME_LENGTH` in `ServiceName::to_string()`
-    [#1095](https://github.com/eclipse-iceoryx/iceoryx2/issues/1095)
-* Fix QNX cross compilation
-    [#1116](https://github.com/eclipse-iceoryx/iceoryx2/issues/1116)
-* `ScopeGuard` check if `on_drop` is set before calling it
-    [#1171](https://github.com/eclipse-iceoryx/iceoryx2/issues/1171)
-* Fix C binding linker error on QNX
-    [#1174](https://github.com/eclipse-iceoryx/iceoryx2/issues/1116)
+* Remove default implementation of `ZeroCopySend` from `Option` and `Duration`
+  [#1312](https://github.com/eclipse-iceoryx/iceoryx2/issues/1312)
+* Bump wheel from 0.45.1 to 0.46.3 in /iceoryx2-ffi/python
+  [#1316](https://github.com/eclipse-iceoryx/iceoryx2/issues/1316)
+* Fix Python type translation for integer types (32-bit)
+  [#1333](https://github.com/eclipse-iceoryx/iceoryx2/issues/1333)
+* Fix GCC 9 build failure
+  [#1342](https://github.com/eclipse-iceoryx/iceoryx2/issues/1342)
+* Bump cryptography from 45.0.7 to 46.0.5 in /iceoryx2-ffi/python
+  [#1316](https://github.com/eclipse-iceoryx/iceoryx2/issues/1348)
+* Fix memory order in queue guards and index queue
+  [#1356](https://github.com/eclipse-iceoryx/iceoryx2/issues/1356)
+* Bump shellexpand from 3.1.1 to 3.1.2 in Rust and Bazel
+  [#1365](https://github.com/eclipse-iceoryx/iceoryx2/issues/1365)
+* Resources cannot always be cleaned up with `dev_permissions` feature flag
+  [#1365](https://github.com/eclipse-iceoryx/iceoryx2/issues/1370)
+* Add `update_connection` to Python bindings
+  [#1380](https://github.com/eclipse-iceoryx/iceoryx2/issues/1380)
+* Add `Config::setup_global_config_from_file` to C++ bindings
+  [#1395](https://github.com/eclipse-iceoryx/iceoryx2/issues/1395)
+* Fix pointer provenance in `RelocatablePtr`
+  [#1405](https://github.com/eclipse-iceoryx/iceoryx2/issues/1405)
+* Bump keccak from 0.1.5 to 0.1.6 in Rust and Bazel
+  [#1416](https://github.com/eclipse-iceoryx/iceoryx2/issues/1416)
+* Bump black formatter from 25.1.0 to 26.3.1 in /iceoryx2-ffi/python
+  [#1431](https://github.com/eclipse-iceoryx/iceoryx2/issues/1431)
 
 ### Refactoring
 
@@ -71,19 +74,29 @@
     NOTE: Add new entries sorted by issue number to minimize the possibility of
     conflicts when merging.
 -->
-
-* Decoupled tunnel implementation from tunelling mechanism
-    [#845](https://github.com/eclipse-iceoryx/iceoryx2/issues/845)
-* Explicitly use components from `core` and `alloc` in all Rust code
-    [#865](https://github.com/eclipse-iceoryx/iceoryx2/issues/865)
-* Enable -Wconversion warning for the C and C++ code
-    [#956](https://github.com/eclipse-iceoryx/iceoryx2/issues/956)
-* Updated all dependencies and increased MSRV to 1.83
-    [#1105](https://github.com/eclipse-iceoryx/iceoryx2/issues/1105)
-* Remove pre-compiled `noop.exe` used for testing command exeuction on Windows
-    [#1133](https://github.com/eclipse-iceoryx/iceoryx2/issues/1133)
-* Support C++14 for the C++ Bindings
-    [#1167](https://github.com/eclipse-iceoryx/iceoryx2/issues/1167)
+* Remove support for Bazel Workspaces
+  [#1263](https://github.com/eclipse-iceoryx/iceoryx2/issues/1263)
+* Adjust test names to naming convention
+  [#1273](https://github.com/eclipse-iceoryx/iceoryx2/issues/1273)
+* Move character output abstraction into their own crate
+  [#1300](https://github.com/eclipse-iceoryx/iceoryx2/issues/1300)
+* Move `iceoryx2-loggers` crate into building blocks as `iceoryx2-bb-loggers`
+  [#1300](https://github.com/eclipse-iceoryx/iceoryx2/issues/1300)
+* Replace `lazy_static` dependency with `LazyLock` from `std` in `std` builds or
+  a custom minimal spin-based implementation for `no_std` builds
+  [#1321](https://github.com/eclipse-iceoryx/iceoryx2/issues/1321)
+* Remove `auto` option from Bazel feature flags and align defaults with CMake
+  [#1326](https://github.com/eclipse-iceoryx/iceoryx2/issues/1326)
+* Remove `posix` feature and use `cfg` switch based on target instead
+  [#1327](https://github.com/eclipse-iceoryx/iceoryx2/issues/1327)
+* `CleanupState` implements `ZeroCopySend`
+  [#1331](https://github.com/eclipse-iceoryx/iceoryx2/issues/1331)
+* Ignore warnings from bindgen generated files with bazel build
+  [#1345](https://github.com/eclipse-iceoryx/iceoryx2/issues/1345)
+* Set Rust minimum required version (MSRV) to version 1.85.0
+  [#1359](https://github.com/eclipse-iceoryx/iceoryx2/issues/1359)
+* Use `libc` constants in linux platform instead of hardcoded values
+  [#1388](https://github.com/eclipse-iceoryx/iceoryx2/issues/1388)
 
 ### Workflow
 
@@ -92,7 +105,10 @@
     conflicts when merging.
 -->
 
-* Example text [#1](https://github.com/eclipse-iceoryx/iceoryx2/issues/1)
+* Add framework for `no_std` testing
+  [#1300](https://github.com/eclipse-iceoryx/iceoryx2/issues/1300)
+* Add CI check for `std` feature propagation
+  [#1300](https://github.com/eclipse-iceoryx/iceoryx2/issues/1300)
 
 ### New API features
 
@@ -101,99 +117,39 @@
     conflicts when merging.
 -->
 
-* Example text [#1](https://github.com/eclipse-iceoryx/iceoryx2/issues/1)
+* Removed `libc_platform` feature, platforms that support the crate `libc` will
+  now automatically use it
+  [#1374](https://github.com/eclipse-iceoryx/iceoryx2/issues/1374)
 
 ### API Breaking Changes
 
-1. **Rust:** Replaced the `FixedSizeVec` with the `StaticVec`
-
-   ```rust
-   // old
-   use iceoryx2_bb_container::vec::FixedSizeVec;
-   const VEC_CAPACITY: usize = 1234;
-   let my_vec = FixedSizeVec::<MyType, VEC_CAPACITY>::new();
-
-   // new
-   use iceoryx2_bb_container::vector::*;
-   const VEC_CAPACITY: usize = 1234;
-   let my_vec = StaticVec::<MyType, VEC_CAPACITY>::new();
-   ```
-
-2. **Rust:** Replaced `Vec` with the `PolymorphicVec`
+1. Loggers have been moved into `iceoryx2-bb-loggers` thus manually linking
+   to them needs to be adjusted accordingly.
 
     ```rust
-   // old
-   use iceoryx2_bb_container::vec::Vec;
-   const VEC_CAPACITY: usize = 1234;
-   let my_vec = Vec::<MyType>::new();
+    // old
+    extern crate iceoryx2_loggers;
 
-   // new
-   use iceoryx2_bb_container::vector::*;
-   let my_stateful_allocator = acquire_allocator();
-   let vec_capacity: usize = 1234;
-   let my_vec = PolymorphicVec::<MyType>::new(my_stateful_allocator, vec_capacity)?;
+    use iceoryx2_log::*;
+
+    set_log_level(LogLevel::Info);
+    info!("some log message")
+
+    // new
+    extern crate iceoryx2_bb_loggers;
+
+    use iceoryx2_log::*;
+
+    set_log_level(LogLevel::Info);
+    info!("some log message")
     ```
 
-3. **Rust:** Replaced the `FixedSizeByteString` with the `StaticString`
+1. Building with `libc` is now default on platforms that support it
 
-   ```rust
-   // old
-   use iceoryx2_bb_container::byte_string::FixedSizeString;
-   const CAPACITY: usize = 1234;
-   let my_str = FixedSizeByteString::<CAPACITY>::new();
+    ```console
+    # old
+    cargo build --features iceoryx2/libc_platform
 
-   // new
-   use iceoryx2_bb_container::string::*;
-   const CAPACITY: usize = 1234;
-   let my_str = StaticString::<CAPACITY>::new();
-   ```
-
-4. **C++:** Remove `operator*` and `operator->` from `ActiveRequest`,
-   `PendingResponse`, `RequestMut`, `RequestMutUninit`, `Response`,
-   `ResponseMut`, `Sample`, `SampleMut`, `SampleMutUninit` since these can
-   easily lead to confusion and bugs when used in combination with `optional`
-   or `expected`. See `sample.has_value()` and `sample->has_value()` that work
-   on different objects.
-
-   ```cxx
-   // old
-   auto sample = publisher.loan().expect("");
-   sample->some_member = 123;
-
-   // new
-   auto sample = publisher.loan().expect("");
-   sample.payload_mut().some_member = 123;
-   ```
-
-   ```cxx
-   // old
-   auto sample = publisher.loan().expect("");
-   *sample = 123;
-   std::cout << *sample << std::endl;
-
-   // new
-   auto sample = publisher.loan().expect("");
-   sample.payload_mut() = 123;
-   std::cout << sample.payload() << std::endl;
-   ```
-
-5. **Rust:** Changed the signature for Tunnel creation to take a concrete
-   backend implementation
-
-   ```rust
-   // old
-   let zenoh_config = zenoh::Config::default(); // coupled to zenoh
-   let tunnel_config = iceoryx2_tunnel::TunnelConfig::default();
-   let iceoryx_config = iceoryx2::config::Config::default();
-
-   let mut tunnel =
-       Tunnel::<Service>::create(&tunnel_config, &iceoryx_config, &zenoh_config).unwrap();
-
-   // new
-   let backend_config = Backend::Config::default();
-   let tunnel_config = iceoryx2_tunnel::Config::default();
-   let iceoryx_config = iceoryx2::config::Config::default();
-
-   let mut tunnel =
-       Tunnel::<Service, Backend>::create(&tunnel_config, &iceoryx_config, &backend_config).unwrap();
-   ```
+    # new
+    cargo build
+    ```

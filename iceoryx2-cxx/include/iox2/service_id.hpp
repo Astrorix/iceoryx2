@@ -13,7 +13,6 @@
 #ifndef IOX2_SERVICE_ID_HPP
 #define IOX2_SERVICE_ID_HPP
 
-#include "iox/string.hpp"
 #include "iox2/internal/iceoryx2.hpp"
 
 namespace iox2 {
@@ -27,7 +26,7 @@ class ServiceId {
     auto c_str() const -> const char*;
 
   private:
-    explicit ServiceId(const iox::string<IOX2_SERVICE_ID_LENGTH>& value);
+    explicit ServiceId(const iox2::bb::StaticString<IOX2_SERVICE_ID_LENGTH>& value);
 
     template <ServiceType>
     friend class PortFactoryEvent;
@@ -38,7 +37,7 @@ class ServiceId {
     template <ServiceType, typename>
     friend class PortFactoryBlackboard;
 
-    iox::string<IOX2_SERVICE_ID_LENGTH> m_value;
+    iox2::bb::StaticString<IOX2_SERVICE_ID_LENGTH> m_value;
 };
 
 } // namespace iox2

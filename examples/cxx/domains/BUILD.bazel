@@ -15,11 +15,12 @@ load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 cc_binary(
     name = "example_cxx_domains_publisher",
     srcs = [
+        "src/parse_args.hpp",
         "src/publisher.cpp",
         "src/transmission_data.hpp",
     ],
     deps = [
-        "@iceoryx//:iceoryx_hoofs",
+        "//:iceoryx2-bb-cxx",
         "//:iceoryx2-cxx-static",
     ],
 )
@@ -27,11 +28,12 @@ cc_binary(
 cc_binary(
     name = "example_cxx_domains_subscriber",
     srcs = [
+        "src/parse_args.hpp",
         "src/subscriber.cpp",
         "src/transmission_data.hpp",
     ],
     deps = [
-        "@iceoryx//:iceoryx_hoofs",
+        "//:iceoryx2-bb-cxx",
         "//:iceoryx2-cxx-static",
     ],
 )
@@ -40,9 +42,10 @@ cc_binary(
     name = "example_cxx_domains_discovery",
     srcs = [
         "src/discovery.cpp",
+        "src/parse_args.hpp",
     ],
     deps = [
-        "@iceoryx//:iceoryx_hoofs",
+        "//:iceoryx2-bb-cxx",
         "//:iceoryx2-cxx-static",
     ],
 )

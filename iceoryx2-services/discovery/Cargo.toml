@@ -15,16 +15,25 @@ version = { workspace = true }
 name = "iceoryx2_services_discovery"
 path = "src/lib.rs"
 
+[features]
+default = ["std"]
+std = [
+  "iceoryx2-bb-concurrency/std",
+  "iceoryx2-bb-container/std",
+  "iceoryx2-bb-elementary/std",
+  "iceoryx2/std",
+]
+
 [dependencies]
 iceoryx2 = { workspace = true }
+iceoryx2-bb-concurrency = { workspace = true }
 iceoryx2-bb-container = { workspace = true }
 iceoryx2-bb-elementary = { workspace = true }
 iceoryx2-bb-elementary-traits = { workspace = true }
-once_cell = { workspace = true }
+
 serde = { workspace = true }
 
 [dev-dependencies]
 iceoryx2-bb-testing = { workspace = true }
-iceoryx2-pal-testing = { workspace = true }
 iceoryx2-bb-posix = { workspace = true }
 generic-tests = { workspace = true }

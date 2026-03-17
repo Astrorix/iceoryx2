@@ -14,10 +14,10 @@
 #define IOX2_ATTRIBUTE_VERIFIER_HPP
 
 #include "attribute_error.hpp"
-#include "iox/expected.hpp"
-#include "iox/vector.hpp"
 #include "iox2/attribute.hpp"
 #include "iox2/attribute_set.hpp"
+#include "iox2/bb/expected.hpp"
+#include "iox2/bb/static_vector.hpp"
 #include "iox2/internal/iceoryx2.hpp"
 
 namespace iox2 {
@@ -36,19 +36,19 @@ class AttributeVerifier {
 
     /// Requires a value for a specific key. A key is allowed to have multiple values.
     auto require(const Attribute::Key& key, const Attribute::Value& value)
-        -> iox::expected<void, AttributeDefinitionError>;
+        -> bb::Expected<void, AttributeDefinitionError>;
 
     /// Requires that a specific key is defined.
-    auto require_key(const Attribute::Key& key) -> iox::expected<void, AttributeDefinitionError>;
+    auto require_key(const Attribute::Key& key) -> bb::Expected<void, AttributeDefinitionError>;
 
     /// Returns the underlying required [`AttributeSet`]
     auto attributes() const -> AttributeSetView;
 
     /// Returns the underlying required keys
-    auto keys() const -> iox::vector<Attribute::Key, IOX2_MAX_ATTRIBUTES_PER_SERVICE>;
+    auto keys() const -> iox2::bb::StaticVector<Attribute::Key, IOX2_MAX_ATTRIBUTES_PER_SERVICE>;
 
     /// Verifies if the [`AttributeSet`] contains all required keys and key-value pairs.
-    auto verify_requirements(const AttributeSetView& rhs) const -> iox::expected<void, Attribute::Key>;
+    auto verify_requirements(const AttributeSetView& rhs) const -> bb::Expected<void, Attribute::Key>;
 
   private:
     template <ServiceType>

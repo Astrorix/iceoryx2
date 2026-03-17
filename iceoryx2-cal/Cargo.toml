@@ -11,32 +11,46 @@ rust-version = { workspace = true }
 version = { workspace = true }
 
 [features]
+default = []
+
+std = [
+  "iceoryx2-bb-concurrency/std",
+  "iceoryx2-bb-container/std",
+  "iceoryx2-bb-elementary/std",  
+  "iceoryx2-bb-derive-macros/std",  
+  "iceoryx2-bb-linux/std",  
+  "iceoryx2-bb-lock-free/std",  
+  "iceoryx2-bb-memory/std",  
+  "iceoryx2-bb-posix/std",
+  "iceoryx2-bb-system-types/std",  
+  "iceoryx2-log/std",  
+]
+
 # The permissions of all resources will be set to read, write, execute for everyone.
 # This shall not be used in production and is meant to be enabled in a docker environment
 # with inconsistent user configuration.
 dev_permissions = []
 
 [dependencies]
+iceoryx2-log = { workspace = true }
 iceoryx2-bb-posix = { workspace = true }
 iceoryx2-bb-linux = { workspace = true }
+iceoryx2-bb-concurrency = { workspace = true }
 iceoryx2-bb-container = { workspace = true }
 iceoryx2-bb-derive-macros = { workspace = true }
 iceoryx2-bb-system-types = { workspace = true }
-iceoryx2-bb-log = { workspace = true }
 iceoryx2-bb-elementary = { workspace = true }
 iceoryx2-bb-elementary-traits = { workspace = true }
 iceoryx2-bb-memory = { workspace = true }
 iceoryx2-bb-lock-free = { workspace = true }
-iceoryx2-pal-concurrency-sync = { workspace = true }
 
 postcard = { workspace = true }
-once_cell = { workspace = true }
 serde = { workspace = true }
-cdr = { workspace = true }
 toml = { workspace = true }
 sha1_smol = { workspace = true }
 tiny-fn = { workspace = true }
 
 [dev-dependencies]
 iceoryx2-bb-testing = { workspace = true }
+iceoryx2-bb-loggers = { workspace = true }
 generic-tests = { workspace = true }

@@ -16,6 +16,8 @@
 //! # Example
 //!
 //! ```
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_lock_free::spsc::index_queue::*;
 //!
 //! const QUEUE_CAPACITY: usize = 128;
@@ -42,16 +44,19 @@
 //! }
 //! ```
 
-use core::{alloc::Layout, cell::UnsafeCell, fmt::Debug, sync::atomic::Ordering};
+use core::{alloc::Layout, fmt::Debug};
+
+use iceoryx2_bb_concurrency::atomic::AtomicBool;
+use iceoryx2_bb_concurrency::atomic::AtomicU64;
+use iceoryx2_bb_concurrency::atomic::Ordering;
+use iceoryx2_bb_concurrency::cell::UnsafeCell;
 use iceoryx2_bb_elementary::math::unaligned_mem_size;
 use iceoryx2_bb_elementary::{bump_allocator::BumpAllocator, relocatable_ptr::RelocatablePointer};
 use iceoryx2_bb_elementary_traits::{
     owning_pointer::OwningPointer, pointer_trait::PointerTrait,
     relocatable_container::RelocatableContainer,
 };
-use iceoryx2_bb_log::{fail, fatal_panic};
-use iceoryx2_pal_concurrency_sync::iox_atomic::IoxAtomicBool;
-use iceoryx2_pal_concurrency_sync::iox_atomic::IoxAtomicU64;
+use iceoryx2_log::{fail, fatal_panic};
 
 /// The [`Producer`] of the [`IndexQueue`]/[`FixedSizeIndexQueue`] which can add values to it
 /// via [`Producer::push()`].
@@ -69,7 +74,9 @@ impl<PointerType: PointerTrait<UnsafeCell<u64>> + Debug> Producer<'_, PointerTyp
 
 impl<PointerType: PointerTrait<UnsafeCell<u64>> + Debug> Drop for Producer<'_, PointerType> {
     fn drop(&mut self) {
-        self.queue.has_producer.store(true, Ordering::Relaxed);
+        // SYNC POINT: producer
+        // sync the internal state with the next producer in another thread
+        self.queue.has_producer.store(true, Ordering::Release);
     }
 }
 
@@ -89,7 +96,9 @@ impl<PointerType: PointerTrait<UnsafeCell<u64>> + Debug> Consumer<'_, PointerTyp
 
 impl<PointerType: PointerTrait<UnsafeCell<u64>> + Debug> Drop for Consumer<'_, PointerType> {
     fn drop(&mut self) {
-        self.queue.has_consumer.store(true, Ordering::Relaxed);
+        // SYNC POINT: consumer
+        // sync the internal state with the next consumer in another thread
+        self.queue.has_consumer.store(true, Ordering::Release);
     }
 }
 
@@ -105,13 +114,13 @@ pub mod details {
     #[repr(C)]
     #[derive(Debug)]
     pub struct IndexQueue<PointerType: PointerTrait<UnsafeCell<u64>>> {
-        data_ptr: PointerType,
+        write_position: AtomicU64,
+        read_position: AtomicU64,
+        pub(super) has_producer: AtomicBool,
+        pub(super) has_consumer: AtomicBool,
+        is_memory_initialized: AtomicBool,
         capacity: usize,
-        write_position: IoxAtomicU64,
-        read_position: IoxAtomicU64,
-        pub(super) has_producer: IoxAtomicBool,
-        pub(super) has_consumer: IoxAtomicBool,
-        is_memory_initialized: IoxAtomicBool,
+        data_ptr: PointerType,
     }
 
     unsafe impl<PointerType: PointerTrait<UnsafeCell<u64>>> Sync for IndexQueue<PointerType> {}
@@ -128,11 +137,11 @@ pub mod details {
             Self {
                 data_ptr,
                 capacity,
-                write_position: IoxAtomicU64::new(0),
-                read_position: IoxAtomicU64::new(0),
-                has_producer: IoxAtomicBool::new(true),
-                has_consumer: IoxAtomicBool::new(true),
-                is_memory_initialized: IoxAtomicBool::new(true),
+                write_position: AtomicU64::new(0),
+                read_position: AtomicU64::new(0),
+                has_producer: AtomicBool::new(true),
+                has_consumer: AtomicBool::new(true),
+                is_memory_initialized: AtomicBool::new(true),
             }
         }
     }
@@ -142,11 +151,11 @@ pub mod details {
             Self {
                 data_ptr: RelocatablePointer::new_uninit(),
                 capacity,
-                write_position: IoxAtomicU64::new(0),
-                read_position: IoxAtomicU64::new(0),
-                has_producer: IoxAtomicBool::new(true),
-                has_consumer: IoxAtomicBool::new(true),
-                is_memory_initialized: IoxAtomicBool::new(false),
+                write_position: AtomicU64::new(0),
+                read_position: AtomicU64::new(0),
+                has_producer: AtomicBool::new(true),
+                has_consumer: AtomicBool::new(true),
+                is_memory_initialized: AtomicBool::new(false),
             }
         }
 
@@ -195,17 +204,27 @@ pub mod details {
         }
 
         unsafe fn at(&self, position: u64) -> *mut u64 {
-            (*self
+            let cell = &*self
                 .data_ptr
                 .as_ptr()
-                .add((position % self.capacity as u64) as usize))
-            .get()
+                .add((position % self.capacity as u64) as usize);
+
+            #[cfg(all(test, loom, feature = "std"))]
+            {
+                cell.get_mut().deref() as *mut u64
+            }
+            #[cfg(not(all(test, loom, feature = "std")))]
+            {
+                cell.get()
+            }
         }
 
         /// Acquires the [`Producer`] of the [`IndexQueue`]. This is threadsafe and lock-free without
         /// restrictions but when another thread has already acquired the [`Producer`] it returns
         /// [`None`] since it is a single producer single consumer [`IndexQueue`].
         /// ```
+        /// # extern crate iceoryx2_bb_loggers;
+        ///
         /// use iceoryx2_bb_lock_free::spsc::index_queue::*;
         ///
         /// const QUEUE_CAPACITY: usize = 128;
@@ -225,7 +244,10 @@ pub mod details {
             match self.has_producer.compare_exchange(
                 true,
                 false,
-                Ordering::Relaxed,
+                // SYNC POINT: producer
+                // sync the internal state with the next producer in another thread
+                Ordering::Acquire,
+                // the producer could not be acquired therefore we do not need to sync anything
                 Ordering::Relaxed,
             ) {
                 Ok(_) => Some(Producer { queue: self }),
@@ -237,6 +259,8 @@ pub mod details {
         /// restrictions but when another thread has already acquired the [`Consumer`] it returns
         /// [`None`] since it is a single producer single consumer [`IndexQueue`].
         /// ```
+        /// # extern crate iceoryx2_bb_loggers;
+        ///
         /// use iceoryx2_bb_lock_free::spsc::index_queue::*;
         ///
         /// const QUEUE_CAPACITY: usize = 128;
@@ -257,7 +281,10 @@ pub mod details {
             match self.has_consumer.compare_exchange(
                 true,
                 false,
-                Ordering::Relaxed,
+                // SYNC POINT: consumer
+                // sync the internal state with the next consumer in another thread
+                Ordering::Acquire,
+                // the consumer could not be acquired therefore we do not need to sync anything
                 Ordering::Relaxed,
             ) {
                 Ok(_) => Some(Consumer { queue: self }),
@@ -269,12 +296,15 @@ pub mod details {
         ///
         /// # Safety
         ///
-        ///   * Ensure that no concurrent push occurres. Only one thread at a time is allowed to call
+        ///   * Ensure that no concurrent push occurs. Only one thread at a time is allowed to call
         ///     push.
         pub unsafe fn push(&self, value: u64) -> bool {
             let write_position = self.write_position.load(Ordering::Relaxed);
             let is_full =
-                write_position == self.read_position.load(Ordering::Relaxed) + self.capacity as u64;
+                ////////////////
+                // SYNC POINT: reading value has finished
+                ////////////////
+                write_position == self.read_position.load(Ordering::Acquire) + self.capacity as u64;
 
             if is_full {
                 return false;
@@ -282,7 +312,7 @@ pub mod details {
 
             unsafe { self.at(write_position).write(value) };
             ////////////////
-            // SYNC POINT
+            // SYNC POINT: value content visible in pop
             ////////////////
             self.write_position
                 .store(write_position + 1, Ordering::Release);
@@ -294,11 +324,11 @@ pub mod details {
         ///
         /// # Safety
         ///
-        ///   * Ensure that no concurrent pop occurres. Only one thread at a time is allowed to call pop.
+        ///   * Ensure that no concurrent pop occurs. Only one thread at a time is allowed to call pop.
         pub unsafe fn pop(&self) -> Option<u64> {
             let read_position = self.read_position.load(Ordering::Relaxed);
             ////////////////
-            // SYNC POINT
+            // SYNC POINT: value content visible in pop
             ////////////////
             let is_empty = read_position == self.write_position.load(Ordering::Acquire);
 
@@ -307,11 +337,11 @@ pub mod details {
             }
 
             let value = unsafe { *self.at(read_position) };
-            // prevent that `out` and `read_position` statements are reordered according to
-            // the AS-IF rule.
-            core::sync::atomic::fence(Ordering::AcqRel);
+            ////////////////
+            // SYNC POINT: reading value has finished
+            ////////////////
             self.read_position
-                .store(read_position + 1, Ordering::Relaxed);
+                .store(read_position + 1, Ordering::Release);
 
             Some(value)
         }
@@ -382,7 +412,7 @@ impl<const CAPACITY: usize> FixedSizeIndexQueue<CAPACITY> {
     pub fn new() -> Self {
         let mut new_self = Self {
             state: unsafe { RelocatableIndexQueue::new_uninit(CAPACITY) },
-            data: core::array::from_fn(|_| UnsafeCell::new(0)),
+            data: [const { UnsafeCell::new(0) }; CAPACITY],
         };
 
         let allocator = BumpAllocator::new(new_self.data.as_mut_ptr().cast());

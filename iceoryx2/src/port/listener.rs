@@ -58,20 +58,20 @@
 //! # }
 //! ```
 
-use core::sync::atomic::Ordering;
 use core::time::Duration;
+use iceoryx2_bb_concurrency::atomic::Ordering;
 
 use alloc::format;
 use alloc::sync::Arc;
 
 use iceoryx2_bb_lock_free::mpmc::container::ContainerHandle;
-use iceoryx2_bb_log::fail;
 use iceoryx2_bb_posix::file_descriptor::{FileDescriptor, FileDescriptorBased};
 use iceoryx2_bb_posix::file_descriptor_set::SynchronousMultiplexing;
 use iceoryx2_cal::arc_sync_policy::ArcSyncPolicy;
 use iceoryx2_cal::dynamic_storage::DynamicStorage;
 use iceoryx2_cal::event::{ListenerBuilder, ListenerWaitError, NamedConceptMgmt, TriggerId};
 use iceoryx2_cal::named_concept::{NamedConceptBuilder, NamedConceptRemoveError};
+use iceoryx2_log::fail;
 
 use crate::config::Config;
 use crate::service::config_scheme::event_config;
@@ -219,7 +219,8 @@ impl<Service: service::Service> Listener<Service> {
             .static_config
             .event()
             .deadline
-            .map(|v| v.value)
+            .map(|v| v.value.into())
+            .into()
     }
 
     /// Non-blocking wait for new [`EventId`]s. Collects all [`EventId`]s that were received and

@@ -18,12 +18,12 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use iceoryx2::{port::listener::Listener, prelude::*};
-use iceoryx2_bb_log::cout;
 
 use clap::Parser;
 
 fn main() -> Result<(), Box<dyn core::error::Error>> {
     set_log_level_from_env_or(LogLevel::Info);
+
     let args = Args::parse();
 
     let node = NodeBuilder::new().create::<ipc::Service>()?;
@@ -59,7 +59,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
         guards.push(guard);
     }
 
-    cout!("Waiting on the following services: {:?}", args.services);
+    coutln!("Waiting on the following services: {:?}", args.services);
 
     // the callback that is called when a listener has received an event
     let on_event = |attachment_id: WaitSetAttachmentId<ipc::Service>| {
@@ -70,7 +70,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
             // busy loop.
             listener
                 .try_wait_all(|event_id| {
-                    cout!("Received trigger from \"{service_name}\" :: {event_id:?}");
+                    coutln!("Received trigger from \"{service_name}\" :: {event_id:?}");
                 })
                 .unwrap();
         }
@@ -83,7 +83,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
     // didn't add this to the example so feel free to play around with it.
     waitset.wait_and_process(on_event)?;
 
-    cout!("exit");
+    coutln!("exit");
 
     Ok(())
 }

@@ -7,9 +7,9 @@ just change the service type.
 
 For instance:
 
-* In **unit tests** running in parallel on a CI system, you may want to avoid
-  creating real inter-process resources like shared memory that could interfere
-  with other tests.
+* When running **unit tests** running in parallel on a CI system, you may want
+  to avoid creating real inter-process resources like shared memory that could
+  interfere with other tests.
 * If you're **sharing GPU memory** across processes, you may want iceoryx2 to
   handle zero-copy communication using custom memory mechanisms.
 * In **embedded systems**, you might need communication across hypervisor
@@ -100,10 +100,10 @@ publisher, as it's confined to the process.
 
 | Service Type                | Scope         | Thread Safety     | Notes                                               |
 | --------------------------- | ------------- | ----------------- | --------------------------------------------------- |
-| `ipc::Service`              | Inter-process | ❌ Not thread-safe | Default for most examples                           |
-| `ipc_threadsafe::Service`   | Inter-process | ✅ Thread-safe     | Adds mutex overhead for safe sharing across threads |
-| `local::Service`            | Intra-process | ❌ Not thread-safe | Confined to the current process                     |
-| `local_threadsafe::Service` | Intra-process | ✅ Thread-safe     | Safe for multi-threaded intra-process communication |
+| `ipc::Service`              | Inter-process | ❌ Not thread-safe| Default for most examples                           |
+| `ipc_threadsafe::Service`   | Inter-process | ✅ Thread-safe    | Adds mutex overhead for safe sharing across threads |
+| `local::Service`            | Intra-process | ❌ Not thread-safe| Confined to the current process                     |
+| `local_threadsafe::Service` | Intra-process | ✅ Thread-safe    | Safe for multi-threaded intra-process communication |
 
 All ports (`Publisher`, `Subscriber`, etc.) and payloads (`Sample`, `Request`,
 etc.) are affected by the service type defined when the `Node` is created.

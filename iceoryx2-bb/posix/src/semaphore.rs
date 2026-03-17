@@ -15,16 +15,17 @@
 
 pub use crate::ipc_capable::{Handle, IpcCapable};
 
-use core::cell::UnsafeCell;
 use core::fmt::Debug;
 
 use crate::ipc_capable::internal::{Capability, HandleStorage, IpcConstructible};
+use iceoryx2_bb_concurrency::cell::UnsafeCell;
 use iceoryx2_bb_container::semantic_string::*;
 use iceoryx2_bb_elementary::enum_gen;
-use iceoryx2_bb_log::{debug, fail, fatal_panic, warn};
 use iceoryx2_bb_system_types::file_name::FileName;
 use iceoryx2_bb_system_types::file_path::*;
 use iceoryx2_bb_system_types::path::*;
+use iceoryx2_log::trace;
+use iceoryx2_log::{debug, fail, fatal_panic, warn};
 use iceoryx2_pal_posix::posix::errno::Errno;
 use iceoryx2_pal_posix::posix::MemZeroedStruct;
 use iceoryx2_pal_posix::*;
@@ -33,7 +34,6 @@ use crate::{
     adaptive_wait::*,
     clock::{AsTimespec, Time, TimeError},
     config::MAX_INITIAL_SEMAPHORE_VALUE,
-    handle_errno,
     system_configuration::*,
 };
 use core::time::Duration;
@@ -57,32 +57,32 @@ enum_gen! { NamedSemaphoreCreationError
     UnknownError(i32)
 }
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum UnnamedSemaphoreCreationError {
+enum_gen! { UnnamedSemaphoreCreationError
+  entry:
     InitialValueTooLarge,
     ExceedsMaximumNumberOfSemaphores,
     InsufficientPermissions,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum SemaphorePostError {
+enum_gen! { SemaphorePostError
+  entry:
     Overflow,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum SemaphoreWaitError {
+enum_gen! { SemaphoreWaitError
+  entry:
     NotSupported,
     DeadlockConditionDetected,
     Interrupt,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum UnnamedSemaphoreOpenIpcHandleError {
+enum_gen! { UnnamedSemaphoreOpenIpcHandleError
+  entry:
     IsNotInterProcessCapable,
-    Uninitialized,
+    Uninitialized
 }
 
 enum_gen! {
@@ -241,6 +241,8 @@ pub trait SemaphoreInterface: internal::SemaphoreHandle + Debug {
 /// ## Create new named semaphore
 ///
 /// ```ignore
+/// # extern crate iceoryx2_bb_loggers;
+///
 /// use iceoryx2_bb_posix::semaphore::*;
 /// use iceoryx2_bb_system_types::file_name::FileName;
 /// use iceoryx2_bb_container::semantic_string::*;
@@ -260,6 +262,8 @@ pub trait SemaphoreInterface: internal::SemaphoreHandle + Debug {
 /// ## Open existing semaphore
 ///
 /// ```no_run
+/// # extern crate iceoryx2_bb_loggers;
+///
 /// use iceoryx2_bb_posix::semaphore::*;
 /// use iceoryx2_bb_system_types::file_name::FileName;
 /// use iceoryx2_bb_container::semantic_string::*;
@@ -346,6 +350,8 @@ impl NamedSemaphoreCreationBuilder {
 ///
 /// ## In process 1
 /// ```no_run
+/// # extern crate iceoryx2_bb_loggers;
+///
 /// use iceoryx2_bb_posix::semaphore::*;
 /// use iceoryx2_bb_posix::clock::*;
 /// use core::time::Duration;
@@ -368,6 +374,8 @@ impl NamedSemaphoreCreationBuilder {
 ///
 /// ## In process 2
 /// ```no_run
+/// # extern crate iceoryx2_bb_loggers;
+///
 /// use iceoryx2_bb_posix::semaphore::*;
 /// use iceoryx2_bb_system_types::file_name::FileName;
 /// use iceoryx2_bb_container::semantic_string::*;
@@ -415,6 +423,8 @@ impl Drop for NamedSemaphore {
         {
             fatal_panic!(from self, "Failed to cleanup semaphore. Something else removed a managed semaphore which should never happen!");
         }
+
+        trace!(from self, "closed");
     }
 }
 
@@ -435,17 +445,22 @@ impl NamedSemaphore {
                 new_sem.has_ownership = true;
                 fail!(from new_sem, when new_sem.unlink(UnlinkMode::IgnoreNonExistingSemaphore), "Failed to remove semaphore before creating a new one.");
                 new_sem.open(config.permission, InitMode::Create, config.initial_value)?;
+                trace!(from new_sem, "created");
             }
             Some(CreationMode::CreateExclusive) => {
                 new_sem.has_ownership = true;
                 new_sem.open(config.permission, InitMode::Create, config.initial_value)?;
+                trace!(from new_sem, "created");
             }
             Some(CreationMode::OpenOrCreate) => {
                 match new_sem.open(Permission::none(), InitMode::TryOpen, 0) {
-                    Ok(()) => (),
+                    Ok(()) => {
+                        trace!(from new_sem, "opened");
+                    }
                     Err(NamedSemaphoreCreationError::DoesNotExist) => {
                         new_sem.has_ownership = true;
                         new_sem.open(config.permission, InitMode::Create, config.initial_value)?;
+                        trace!(from new_sem, "created");
                     }
                     Err(v) => return Err(v),
                 }
@@ -459,7 +474,7 @@ impl NamedSemaphore {
         let file_path =
             FilePath::from_path_and_file(&Path::new(b"/").unwrap(), &self.name).unwrap();
         if unsafe { posix::sem_unlink(file_path.as_c_str()) } == 0 {
-            debug!(from self, "semaphore removed.");
+            trace!(from self, "removed");
             return Ok(());
         }
 
@@ -553,6 +568,8 @@ impl SemaphoreInterface for NamedSemaphore {}
 /// # Example
 ///
 /// ```
+/// # extern crate iceoryx2_bb_loggers;
+///
 /// use iceoryx2_bb_posix::semaphore::*;
 ///
 /// let semaphore_handle = UnnamedSemaphoreHandle::new();
@@ -665,10 +682,13 @@ unsafe impl Sync for UnnamedSemaphoreHandle {}
 
 impl Handle for UnnamedSemaphoreHandle {
     fn new() -> Self {
-        Self {
+        let new_self = Self {
             handle: HandleStorage::new(posix::sem_t::new_zeroed()),
             clock_type: UnsafeCell::new(ClockType::default()),
-        }
+        };
+
+        trace!(from new_self, "created");
+        new_self
     }
 
     fn is_inter_process_capable(&self) -> bool {
@@ -691,6 +711,8 @@ impl Drop for UnnamedSemaphoreHandle {
                     }
                 });
             };
+
+            trace!(from self, "removed");
         }
     }
 }
@@ -700,6 +722,8 @@ impl Drop for UnnamedSemaphoreHandle {
 /// # Example
 ///
 /// ```no_run
+/// # extern crate iceoryx2_bb_loggers;
+///
 /// use iceoryx2_bb_posix::semaphore::*;
 /// use std::thread;
 /// use iceoryx2_bb_posix::clock::*;

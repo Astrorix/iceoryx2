@@ -13,9 +13,9 @@
 #ifndef IOX2_PENDING_RESPONSE_HPP
 #define IOX2_PENDING_RESPONSE_HPP
 
-#include "iox/expected.hpp"
-#include "iox/optional.hpp"
-#include "iox/slice.hpp"
+#include "iox2/bb/expected.hpp"
+#include "iox2/bb/optional.hpp"
+#include "iox2/bb/slice.hpp"
 #include "iox2/header_request_response.hpp"
 #include "iox2/payload_info.hpp"
 #include "iox2/response.hpp"
@@ -49,8 +49,7 @@ class PendingResponse {
 
     /// Receives a [`Response`] from one of the [`Server`]s that
     /// received the [`RequestMut`].
-    auto receive()
-        -> iox::expected<iox::optional<Response<Service, ResponsePayload, ResponseUserHeader>>, ReceiveError>;
+    auto receive() -> bb::Expected<bb::Optional<Response<Service, ResponsePayload, ResponseUserHeader>>, ReceiveError>;
 
     /// Returns a reference to the iceoryx2 internal [`RequestHeader`] of
     /// the corresponding [`RequestMut`]
@@ -64,13 +63,13 @@ class PendingResponse {
 
     /// Returns a reference to the request payload of the corresponding
     /// [`RequestMut`]
-    template <typename T = RequestPayload, typename = std::enable_if_t<!iox::IsSlice<T>::VALUE, void>>
+    template <typename T = RequestPayload, typename = std::enable_if_t<!bb::IsSlice<T>::VALUE, void>>
     auto payload() const -> const T&;
 
     /// Returns a reference to the request payload of the corresponding
     /// [`RequestMut`]
-    template <typename T = RequestPayload, typename = std::enable_if_t<iox::IsSlice<T>::VALUE, void>>
-    auto payload() const -> iox::ImmutableSlice<ValueType>;
+    template <typename T = RequestPayload, typename = std::enable_if_t<bb::IsSlice<T>::VALUE, void>>
+    auto payload() const -> bb::ImmutableSlice<ValueType>;
 
     /// Returns how many [`Server`]s received the corresponding
     /// [`RequestMut`] initially.
@@ -102,8 +101,8 @@ class PendingResponse {
               typename ResponseUserHeaderT>
     friend auto
     send(RequestMut<S, RequestPayloadT, RequestUserHeaderT, ResponsePayloadT, ResponseUserHeaderT>&& request)
-        -> iox::expected<PendingResponse<S, RequestPayloadT, RequestUserHeaderT, ResponsePayloadT, ResponseUserHeaderT>,
-                         RequestSendError>;
+        -> bb::Expected<PendingResponse<S, RequestPayloadT, RequestUserHeaderT, ResponsePayloadT, ResponseUserHeaderT>,
+                        RequestSendError>;
 
     explicit PendingResponse(iox2_pending_response_h handle) noexcept;
 
@@ -154,18 +153,18 @@ template <ServiceType Service,
           typename ResponsePayload,
           typename ResponseUserHeader>
 inline auto PendingResponse<Service, RequestPayload, RequestUserHeader, ResponsePayload, ResponseUserHeader>::receive()
-    -> iox::expected<iox::optional<Response<Service, ResponsePayload, ResponseUserHeader>>, ReceiveError> {
+    -> bb::Expected<bb::Optional<Response<Service, ResponsePayload, ResponseUserHeader>>, ReceiveError> {
     iox2_response_h response_handle {};
     auto result = iox2_pending_response_receive(&m_handle, nullptr, &response_handle);
 
     if (result == IOX2_OK) {
         if (response_handle != nullptr) {
             Response<Service, ResponsePayload, ResponseUserHeader> response(response_handle);
-            return iox::ok(iox::optional<Response<Service, ResponsePayload, ResponseUserHeader>>(std::move(response)));
+            return bb::Optional<Response<Service, ResponsePayload, ResponseUserHeader>>(std::move(response));
         }
-        return iox::ok(iox::optional<Response<Service, ResponsePayload, ResponseUserHeader>>(iox::nullopt));
+        return bb::Optional<Response<Service, ResponsePayload, ResponseUserHeader>>(bb::NULLOPT);
     }
-    return iox::err(iox::into<ReceiveError>(result));
+    return bb::err(bb::into<ReceiveError>(result));
 }
 
 template <ServiceType Service,
@@ -216,13 +215,13 @@ template <ServiceType Service,
 template <typename T, typename>
 inline auto
 PendingResponse<Service, RequestPayload, RequestUserHeader, ResponsePayload, ResponseUserHeader>::payload() const
-    -> iox::ImmutableSlice<ValueType> {
+    -> bb::ImmutableSlice<ValueType> {
     const void* ptr = nullptr;
     size_t number_of_elements = 0;
 
     iox2_pending_response_payload(&m_handle, &ptr, &number_of_elements);
 
-    return iox::ImmutableSlice<ValueType>(static_cast<const ValueType*>(ptr), number_of_elements);
+    return bb::ImmutableSlice<ValueType>(static_cast<const ValueType*>(ptr), number_of_elements);
 }
 
 template <ServiceType Service,

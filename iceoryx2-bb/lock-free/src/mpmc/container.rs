@@ -25,6 +25,8 @@
 //! # Example
 //!
 //! ```
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_lock_free::mpmc::container::*;
 //!
 //! const CAPACITY: usize = 139;
@@ -54,9 +56,12 @@
 //! ```
 
 pub use crate::mpmc::unique_index_set::ReleaseMode;
-use iceoryx2_bb_elementary::bump_allocator::BumpAllocator;
 pub use iceoryx2_bb_elementary::CallbackProgression;
 
+use iceoryx2_bb_concurrency::atomic::Ordering;
+use iceoryx2_bb_concurrency::atomic::{AtomicBool, AtomicU64};
+use iceoryx2_bb_concurrency::cell::UnsafeCell;
+use iceoryx2_bb_elementary::bump_allocator::BumpAllocator;
 use iceoryx2_bb_elementary::math::align_to;
 use iceoryx2_bb_elementary::math::unaligned_mem_size;
 use iceoryx2_bb_elementary::relocatable_ptr::RelocatablePointer;
@@ -65,8 +70,7 @@ use iceoryx2_bb_elementary_traits::allocator::AllocationError;
 use iceoryx2_bb_elementary_traits::allocator::BaseAllocator;
 use iceoryx2_bb_elementary_traits::pointer_trait::PointerTrait;
 use iceoryx2_bb_elementary_traits::relocatable_container::RelocatableContainer;
-use iceoryx2_bb_log::{fail, fatal_panic};
-use iceoryx2_pal_concurrency_sync::iox_atomic::{IoxAtomicBool, IoxAtomicU64};
+use iceoryx2_log::{fail, fatal_panic};
 
 use crate::mpmc::unique_index_set::*;
 
@@ -76,7 +80,7 @@ use alloc::vec::Vec;
 
 use core::alloc::Layout;
 use core::fmt::Debug;
-use core::{cell::UnsafeCell, mem::MaybeUninit, sync::atomic::Ordering};
+use core::mem::MaybeUninit;
 
 /// States the reason why an element could not be added to the [`Container`]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -138,6 +142,8 @@ impl<T: Copy + Debug> ContainerState<T> {
     /// **Note:** The index of a value never changes as long as it is stored inside the container.
     ///
     /// ```
+    /// # extern crate iceoryx2_bb_loggers;
+    ///
     /// use iceoryx2_bb_lock_free::mpmc::container::*;
     ///
     /// let container = FixedSizeContainer::<u128, 128>::new();
@@ -173,11 +179,11 @@ impl<T: Copy + Debug> ContainerState<T> {
 #[derive(Debug)]
 pub struct Container<T: Copy + Debug> {
     // must be first member, otherwise the offset calculations fail
-    active_index_ptr: RelocatablePointer<IoxAtomicU64>,
+    active_index_ptr: RelocatablePointer<AtomicU64>,
     data_ptr: RelocatablePointer<UnsafeCell<MaybeUninit<T>>>,
     capacity: usize,
-    change_counter: IoxAtomicU64,
-    is_initialized: IoxAtomicBool,
+    change_counter: AtomicU64,
+    is_initialized: AtomicBool,
     container_id: UniqueId,
     // must be the last member, since it is a relocatable container as well and then the offset
     // calculations would again fail
@@ -195,13 +201,12 @@ impl<T: Copy + Debug> RelocatableContainer for Container<T> {
             container_id: UniqueId::new(),
             active_index_ptr: RelocatablePointer::new(distance_to_active_index),
             data_ptr: RelocatablePointer::new(align_to::<MaybeUninit<T>>(
-                distance_to_active_index as usize
-                    + capacity * core::mem::size_of::<IoxAtomicBool>(),
+                distance_to_active_index as usize + capacity * core::mem::size_of::<AtomicBool>(),
             ) as isize),
             capacity,
-            change_counter: IoxAtomicU64::new(0),
+            change_counter: AtomicU64::new(0),
             index_set: UniqueIndexSet::new_uninit(capacity),
-            is_initialized: IoxAtomicBool::new(false),
+            is_initialized: AtomicBool::new(false),
         }
     }
 
@@ -218,8 +223,8 @@ impl<T: Copy + Debug> RelocatableContainer for Container<T> {
             "{} since the underlying UniqueIndexSet could not be initialized", msg);
 
         self.active_index_ptr.init(fail!(from self, when allocator.allocate(Layout::from_size_align_unchecked(
-                        core::mem::size_of::<IoxAtomicU64>() * self.capacity,
-                        core::mem::align_of::<IoxAtomicU64>())), "{} since the allocation of the active index memory failed.",
+                        core::mem::size_of::<AtomicU64>() * self.capacity,
+                        core::mem::align_of::<AtomicU64>())), "{} since the allocation of the active index memory failed.",
                 msg));
         self.data_ptr.init(
             fail!(from self, when allocator.allocate(Layout::from_size_align_unchecked(
@@ -230,9 +235,9 @@ impl<T: Copy + Debug> RelocatableContainer for Container<T> {
         );
 
         for i in 0..self.capacity {
-            (self.active_index_ptr.as_ptr() as *mut IoxAtomicU64)
+            (self.active_index_ptr.as_ptr() as *mut AtomicU64)
                 .add(i)
-                .write(IoxAtomicU64::new(0));
+                .write(AtomicU64::new(0));
             (self.data_ptr.as_ptr() as *mut UnsafeCell<MaybeUninit<T>>)
                 .add(i)
                 .write(UnsafeCell::new(MaybeUninit::uninit()));
@@ -259,7 +264,7 @@ impl<T: Copy + Debug> Container<T> {
     pub const fn const_memory_size(capacity: usize) -> usize {
         UniqueIndexSet::const_memory_size(capacity)
         //  ActiveIndexPtr
-        + unaligned_mem_size::<IoxAtomicU64>(capacity)
+        + unaligned_mem_size::<AtomicU64>(capacity)
         // data ptr
         + unaligned_mem_size::<T>(capacity)
     }
@@ -447,7 +452,7 @@ pub struct FixedSizeContainer<T: Copy + Debug, const CAPACITY: usize> {
     next_free_index_plus_one: UnsafeCell<u32>,
 
     // DO NOT CHANGE MEMBER ORDER actual Container variable data
-    active_index: [IoxAtomicU64; CAPACITY],
+    active_index: [AtomicU64; CAPACITY],
     data: [UnsafeCell<MaybeUninit<T>>; CAPACITY],
 }
 
@@ -457,8 +462,8 @@ impl<T: Copy + Debug, const CAPACITY: usize> Default for FixedSizeContainer<T, C
             container: unsafe { Container::new_uninit(CAPACITY) },
             next_free_index: core::array::from_fn(|i| UnsafeCell::new(i as u32 + 1)),
             next_free_index_plus_one: UnsafeCell::new(CAPACITY as u32 + 1),
-            active_index: core::array::from_fn(|_| IoxAtomicU64::new(0)),
-            data: core::array::from_fn(|_| UnsafeCell::new(MaybeUninit::uninit())),
+            active_index: [const { AtomicU64::new(0) }; CAPACITY],
+            data: [const { UnsafeCell::new(MaybeUninit::uninit()) }; CAPACITY],
         };
 
         let allocator = BumpAllocator::new(new_self.next_free_index.as_mut_ptr().cast());
@@ -496,6 +501,8 @@ impl<T: Copy + Debug, const CAPACITY: usize> FixedSizeContainer<T, CAPACITY> {
     /// [`None`], otherwise [`Some`] containing the the index value to the underlying element.
     ///
     /// ```
+    /// # extern crate iceoryx2_bb_loggers;
+    ///
     /// use iceoryx2_bb_lock_free::mpmc::container::*;
     ///
     /// const CAPACITY: usize = 139;
@@ -540,6 +547,8 @@ impl<T: Copy + Debug, const CAPACITY: usize> FixedSizeContainer<T, CAPACITY> {
     /// If the state has changed it returns true, otherwise false.
     ///
     /// ```
+    /// # extern crate iceoryx2_bb_loggers;
+    ///
     /// use iceoryx2_bb_lock_free::mpmc::container::*;
     ///
     /// let container = FixedSizeContainer::<u128, 128>::new();

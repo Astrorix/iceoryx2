@@ -11,14 +11,14 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::math::align;
-use core::sync::atomic::Ordering;
 use iceoryx2_bb_elementary_traits::allocator::{AllocationError, BaseAllocator};
-use iceoryx2_pal_concurrency_sync::iox_atomic::IoxAtomicUsize;
+use iceoryx2_pal_concurrency_sync::atomic::AtomicUsize;
+use iceoryx2_pal_concurrency_sync::atomic::Ordering;
 
 /// A minimalistic [`BumpAllocator`].
 pub struct BumpAllocator {
     start: *mut u8,
-    pos: IoxAtomicUsize,
+    pos: AtomicUsize,
 }
 
 impl BumpAllocator {
@@ -26,7 +26,7 @@ impl BumpAllocator {
     pub fn new(start: *mut u8) -> Self {
         Self {
             start,
-            pos: IoxAtomicUsize::new(start as usize),
+            pos: AtomicUsize::new(start as usize),
         }
     }
 }

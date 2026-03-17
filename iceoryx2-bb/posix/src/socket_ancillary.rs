@@ -20,6 +20,8 @@
 //! # Example
 //!
 //! ```no_run
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_posix::unix_datagram_socket::*;
 //! use iceoryx2_bb_posix::socket_ancillary::*;
 //! use iceoryx2_bb_posix::file::*;
@@ -83,7 +85,7 @@ use crate::{
     file_descriptor::FileDescriptor, group::Gid, process::*,
     unix_datagram_socket::UnixDatagramReceiver, user::Uid,
 };
-use iceoryx2_bb_log::warn;
+use iceoryx2_log::warn;
 use iceoryx2_pal_posix::{posix::MemZeroedStruct, *};
 
 /// Defines the maximum amount of [`FileDescriptor`]s which can be sent with a single message.
@@ -190,8 +192,8 @@ pub struct SocketAncillary {
 
 impl Display for SocketAncillary {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let cred = if self.credentials.is_some() {
-            format!("{}", self.credentials.as_ref().unwrap())
+        let cred = if let Some(credentials) = self.credentials.as_ref() {
+            format!("{}", credentials)
         } else {
             "None".to_string()
         };
@@ -437,8 +439,7 @@ impl SocketAncillary {
                     as usize;
         }
 
-        if self.credentials.is_some() {
-            let credentials = self.credentials.unwrap();
+        if let Some(credentials) = self.credentials {
             let mut header = if !self.file_descriptors.is_empty() {
                 self.header_from(unsafe { posix::CMSG_NXTHDR(&self.message, posix::CMSG_FIRSTHDR(&self.message)) }).expect(
                     "Bug in implementation. There should be always enough space to acquire cmsghdr for credentials.",

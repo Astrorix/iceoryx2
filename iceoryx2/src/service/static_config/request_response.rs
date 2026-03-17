@@ -50,7 +50,7 @@ use super::message_type_details::MessageTypeDetails;
 /// [`MessagingPattern::RequestResponse`](crate::service::messaging_pattern::MessagingPattern::RequestResponse)
 /// based service. Contains all parameters that do not change during the lifetime of a
 /// [`Service`](crate::service::Service).
-#[derive(Debug, Clone, Eq, Hash, PartialEq, ZeroCopySend, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, ZeroCopySend, Serialize, Deserialize)]
 #[repr(C)]
 pub struct StaticConfig {
     pub(crate) enable_safe_overflow_for_requests: bool,
@@ -119,10 +119,15 @@ impl StaticConfig {
     pub(crate) fn required_amount_of_chunks_per_server_data_segment(
         &self,
         max_loaned_responses_per_request: usize,
-        total_number_of_requests_per_client: usize,
     ) -> usize {
-        let total_number_of_requests = self.max_clients * total_number_of_requests_per_client;
-        total_number_of_requests
+        self.max_clients
+            * (
+                // a client sent so many active requests to a server in parallel
+                self.max_active_requests_per_client +
+                // the server can still hold old requests that the client has already dropped. in this case
+                // the client can fill up the server's buffer with at most max_active_requests_per_client again
+                self.max_active_requests_per_client
+            )
             * (self.max_response_buffer_size
                 + self.max_borrowed_responses_per_pending_response
                 + max_loaned_responses_per_request)

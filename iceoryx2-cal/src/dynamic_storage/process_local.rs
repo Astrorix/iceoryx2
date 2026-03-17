@@ -16,6 +16,8 @@
 //! # Example
 //!
 //! ```
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_system_types::file_name::FileName;
 //! use iceoryx2_bb_container::semantic_string::SemanticString;
 //! use iceoryx2_cal::dynamic_storage::process_local::*;
@@ -42,7 +44,7 @@ use core::any::Any;
 use core::fmt::Debug;
 use core::marker::PhantomData;
 use core::ptr::NonNull;
-use core::sync::atomic::Ordering;
+use iceoryx2_bb_concurrency::atomic::Ordering;
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -52,16 +54,15 @@ use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
 
+use iceoryx2_bb_concurrency::atomic::AtomicBool;
+use iceoryx2_bb_concurrency::lazy_lock::LazyLock;
 use iceoryx2_bb_elementary_traits::allocator::BaseAllocator;
-use iceoryx2_bb_log::{fail, fatal_panic};
 use iceoryx2_bb_memory::heap_allocator::HeapAllocator;
 use iceoryx2_bb_posix::mutex::*;
 use iceoryx2_bb_system_types::file_name::FileName;
 use iceoryx2_bb_system_types::file_path::FilePath;
 use iceoryx2_bb_system_types::path::Path;
-use iceoryx2_pal_concurrency_sync::iox_atomic::IoxAtomicBool;
-
-use once_cell::sync::Lazy;
+use iceoryx2_log::{fail, fatal_panic};
 
 pub use crate::dynamic_storage::*;
 use crate::named_concept::{
@@ -190,25 +191,23 @@ impl<T> Drop for StorageDetails<T> {
 unsafe impl<T> Send for StorageDetails<T> {}
 unsafe impl<T> Sync for StorageDetails<T> {}
 
-static PROCESS_LOCAL_MTX_HANDLE: Lazy<MutexHandle<BTreeMap<FilePath, StorageEntry>>> =
-    Lazy::new(MutexHandle::new);
-static PROCESS_LOCAL_STORAGE: Lazy<Mutex<BTreeMap<FilePath, StorageEntry>>> = Lazy::new(|| {
-    let result = MutexBuilder::new()
-        .is_interprocess_capable(false)
-        .create(BTreeMap::new(), &PROCESS_LOCAL_MTX_HANDLE);
+static PROCESS_LOCAL_MTX_HANDLE: LazyLock<MutexHandle<BTreeMap<FilePath, StorageEntry>>> =
+    LazyLock::new(MutexHandle::new);
 
-    if result.is_err() {
-        fatal_panic!(from "PROCESS_LOCAL_STORAGE", "Failed to create global dynamic storage");
-    }
-
-    result.unwrap()
-});
+static PROCESS_LOCAL_STORAGE: LazyLock<Mutex<'static, 'static, BTreeMap<FilePath, StorageEntry>>> =
+    LazyLock::new(|| {
+        fatal_panic!(from "PROCESS_LOCAL_STORAGE",
+            when MutexBuilder::new()
+                .is_interprocess_capable(false)
+                .create(BTreeMap::new(), &PROCESS_LOCAL_MTX_HANDLE),
+            "Failed to create global dynamic storage")
+    });
 
 #[derive(Debug)]
 pub struct Storage<T: Send + Sync + Debug + 'static> {
     name: FileName,
     data: Arc<StorageDetails<T>>,
-    has_ownership: IoxAtomicBool,
+    has_ownership: AtomicBool,
     config: Configuration<T>,
 }
 
@@ -396,7 +395,7 @@ impl<T: Send + Sync + Debug + 'static> Builder<'_, T> {
                 .clone()
                 .downcast::<StorageDetails<T>>()
                 .unwrap(),
-            has_ownership: IoxAtomicBool::new(false),
+            has_ownership: AtomicBool::new(false),
             config: self.config.clone(),
         })
     }
@@ -455,7 +454,7 @@ impl<T: Send + Sync + Debug + 'static> Builder<'_, T> {
                 .clone()
                 .downcast::<StorageDetails<T>>()
                 .unwrap(),
-            has_ownership: IoxAtomicBool::new(self.has_ownership),
+            has_ownership: AtomicBool::new(self.has_ownership),
             config: self.config.clone(),
         })
     }

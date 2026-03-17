@@ -11,14 +11,13 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use iceoryx2::prelude::*;
+use iceoryx2_bb_concurrency::atomic::AtomicU32;
+use iceoryx2_bb_concurrency::atomic::Ordering;
 use iceoryx2_bb_conformance_test_macros::conformance_test_module;
 use iceoryx2_bb_posix::unique_system_id::UniqueSystemId;
-use iceoryx2_pal_concurrency_sync::iox_atomic::IoxAtomicU32;
 
 use iceoryx2::config::Config;
 use iceoryx2::node::testing::__internal_node_staged_death;
-
-use core::sync::atomic::Ordering;
 
 pub struct TestDetails<S: Service> {
     node: Node<S>,
@@ -32,7 +31,7 @@ pub trait Test {
     }
 
     fn create_test_node(config: &Config) -> TestDetails<Self::Service> {
-        static COUNTER: IoxAtomicU32 = IoxAtomicU32::new(0);
+        static COUNTER: AtomicU32 = AtomicU32::new(0);
         let node_name = Self::generate_node_name(0, "toby or no toby");
         let fake_node_id = ((u32::MAX - COUNTER.fetch_add(1, Ordering::Relaxed)) as u128) << 96;
         let fake_node_id = unsafe { core::mem::transmute::<u128, UniqueSystemId>(fake_node_id) };
@@ -188,7 +187,7 @@ pub mod node_death {
         core::mem::forget(bad_publishers);
         core::mem::forget(bad_subscribers);
 
-        assert_that!(Node::<S::Service>::cleanup_dead_nodes(&config), eq CleanupState { cleanups: NUMBER_OF_BAD_NODES, failed_cleanups: 0});
+        assert_that!(Node::<S::Service>::cleanup_dead_nodes(&config), eq CleanupState { cleanups: NUMBER_OF_BAD_NODES as _, failed_cleanups: 0});
 
         for service in &services {
             assert_that!(service.dynamic_config().number_of_publishers(), eq NUMBER_OF_PUBLISHERS - NUMBER_OF_BAD_NODES);
@@ -270,7 +269,7 @@ pub mod node_death {
         core::mem::forget(bad_notifiers);
         core::mem::forget(bad_listeners);
 
-        assert_that!(Node::<S::Service>::cleanup_dead_nodes(&config), eq CleanupState { cleanups: NUMBER_OF_BAD_NODES, failed_cleanups: 0});
+        assert_that!(Node::<S::Service>::cleanup_dead_nodes(&config), eq CleanupState { cleanups: NUMBER_OF_BAD_NODES as _, failed_cleanups: 0});
 
         for service in &services {
             assert_that!(service.dynamic_config().number_of_notifiers(), eq NUMBER_OF_NOTIFIERS - NUMBER_OF_BAD_NODES);
@@ -395,7 +394,7 @@ pub mod node_death {
         core::mem::forget(bad_clients);
         core::mem::forget(bad_servers);
 
-        assert_that!(Node::<S::Service>::cleanup_dead_nodes(&config), eq CleanupState { cleanups: NUMBER_OF_BAD_NODES, failed_cleanups: 0});
+        assert_that!(Node::<S::Service>::cleanup_dead_nodes(&config), eq CleanupState { cleanups: NUMBER_OF_BAD_NODES as _, failed_cleanups: 0});
 
         for service in &services {
             assert_that!(service.dynamic_config().number_of_clients(), eq NUMBER_OF_CLIENTS - NUMBER_OF_BAD_NODES);
@@ -476,7 +475,7 @@ pub mod node_death {
 
         core::mem::forget(bad_readers);
 
-        assert_that!(Node::<S::Service>::cleanup_dead_nodes(&config), eq CleanupState { cleanups: NUMBER_OF_BAD_NODES, failed_cleanups: 0});
+        assert_that!(Node::<S::Service>::cleanup_dead_nodes(&config), eq CleanupState { cleanups: NUMBER_OF_BAD_NODES as _, failed_cleanups: 0});
 
         for service in &services {
             assert_that!(service.dynamic_config().number_of_readers(), eq NUMBER_OF_READERS - NUMBER_OF_BAD_NODES);
@@ -517,7 +516,7 @@ pub mod node_death {
 
         assert_that!(good_service.dynamic_config().number_of_readers(), eq 1);
         assert_that!(good_service.dynamic_config().number_of_writers(), eq 0);
-        assert_that!(reader.entry::<u64>(&0).unwrap().get(), eq 0);
+        assert_that!(*reader.entry::<u64>(&0).unwrap().get(), eq 0);
 
         let writer = good_service.writer_builder().create().unwrap();
         let entry_handle_mut = writer.entry::<u64>(&0).unwrap();
@@ -525,7 +524,7 @@ pub mod node_death {
 
         assert_that!(good_service.dynamic_config().number_of_readers(), eq 1);
         assert_that!(good_service.dynamic_config().number_of_writers(), eq 1);
-        assert_that!(reader.entry::<u64>(&0).unwrap().get(), eq 1);
+        assert_that!(*reader.entry::<u64>(&0).unwrap().get(), eq 1);
     }
 
     #[conformance_test]

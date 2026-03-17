@@ -20,10 +20,6 @@ set(${PROJECT_NAME}_DIR ${PROJECT_SOURCE_DIR}/cmake
     FORCE
 )
 
-if(ICEORYX_WITH_FETCH_CONTENT)
-    return()
-endif()
-
 #
 ########## set variables for export ##########
 #
@@ -78,7 +74,9 @@ install(
 
 # license
 install(
-    FILES ${PROJECT_SOURCE_DIR}/LICENSE-APACHE  ${PROJECT_SOURCE_DIR}/LICENSE-MIT
+    FILES ${PROJECT_SOURCE_DIR}/LICENSE-APACHE
+        ${PROJECT_SOURCE_DIR}/LICENSE-MIT
+        ${PROJECT_SOURCE_DIR}/NOTICE.md
     DESTINATION ${DESTINATION_DATAROOTDIR}/doc/${PROJECT_NAME}
     COMPONENT dev
 )

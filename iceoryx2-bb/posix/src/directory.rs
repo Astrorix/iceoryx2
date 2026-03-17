@@ -15,6 +15,8 @@
 //!
 //! # Examples
 //! ```
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_posix::directory::*;
 //! use iceoryx2_bb_system_types::path::Path;
 //! use iceoryx2_bb_container::semantic_string::SemanticString;
@@ -42,8 +44,8 @@ use iceoryx2_bb_container::semantic_string::SemanticString;
 use iceoryx2_bb_container::string::strnlen;
 use iceoryx2_bb_elementary::enum_gen;
 use iceoryx2_bb_elementary::scope_guard::ScopeGuardBuilder;
-use iceoryx2_bb_log::{error, fail, fatal_panic, trace};
 use iceoryx2_bb_system_types::{file_name::FileName, file_path::FilePath, path::Path};
+use iceoryx2_log::{error, fail, fatal_panic, trace};
 use iceoryx2_pal_configuration::PATH_SEPARATOR;
 use iceoryx2_pal_posix::posix::MemZeroedStruct;
 use iceoryx2_pal_posix::*;
@@ -65,15 +67,15 @@ enum_gen! { DirectoryOpenError
     UnknownError(i32)
 }
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum DirectoryStatError {
+enum_gen! { DirectoryStatError
+  entry:
     InsufficientPermissions,
     IOerror,
     DoesNotExist,
     PathPrefixIsNotADirectory,
     DataOverflowInStatStruct,
     LoopInSymbolicLinks,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
 enum_gen! { DirectoryReadError
@@ -99,6 +101,7 @@ enum_gen! { DirectoryCreateError
     PartsOfThePathAreNotADirectory,
     NoSpaceLeft,
     ReadOnlyFilesystem,
+    UnableToApplyPermissions,
     UnknownError(i32)
   mapping:
     DirectoryOpenError
@@ -123,14 +126,14 @@ enum_gen! { DirectoryRemoveError
     FileRemoveError
 }
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum DirectoryAccessError {
+enum_gen! { DirectoryAccessError
+  entry:
     InsufficientPermissions,
     IOerror,
     PathPrefixIsNotADirectory,
     DataOverflowInStatStruct,
     LoopInSymbolicLinks,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
 enum_gen! {
@@ -152,6 +155,8 @@ enum_gen! {
 /// # Example
 ///
 /// ```
+/// # extern crate iceoryx2_bb_loggers;
+///
 /// use iceoryx2_bb_posix::directory::*;
 /// use iceoryx2_bb_system_types::path::Path;
 /// use iceoryx2_bb_container::semantic_string::SemanticString;
@@ -166,6 +171,7 @@ enum_gen! {
 /// }
 /// Directory::remove(&dir_name).unwrap();
 /// ```
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct DirectoryEntry {
     name: FileName,
     metadata: Metadata,
@@ -219,6 +225,8 @@ impl Drop for Directory {
                 error!(from self, "Tried {} times to close the file but failed.", counter);
             }
         }
+
+        trace!(from self, "closed");
     }
 }
 
@@ -246,21 +254,26 @@ impl Directory {
                 "This should never happen! {} since 'dirfd' states that the acquired directory stream is invalid.", msg);
         }
 
-        Ok(Directory {
+        let new_self = Directory {
             path: *path,
             directory_stream,
             file_descriptor: file_descriptor.unwrap(),
-        })
+        };
+
+        trace!(from new_self, "opened");
+
+        Ok(new_self)
     }
 
     fn create_single_directory(
         path: &Path,
         permission: Permission,
     ) -> Result<(), DirectoryCreateError> {
+        let origin = "Directory::create()";
         let msg = format!("Unable to create directory \"{path}\"");
 
         if unsafe { posix::mkdir(path.as_c_str(), permission.as_mode()) } == -1 {
-            handle_errno!(DirectoryCreateError, from "Directory::create",
+            handle_errno!(DirectoryCreateError, from origin,
                 Errno::EACCES => (InsufficientPermissions, "{} due to insufficient permissions.", msg),
                 Errno::EEXIST => (DirectoryAlreadyExists, "{} since the directory already exists.", msg),
                 Errno::ELOOP => (LoopInSymbolicLinks, "{} due to a loop in the symbolic links.", msg),
@@ -273,6 +286,29 @@ impl Directory {
             );
         }
 
+        // Reapply the permissions since the `umask` call can influence the
+        // permission creation. It would be possible to adjust the umask(0)
+        // and restore it afterwards but this applies the umask to the whole
+        // process and could influence a thread which calls umask as well.
+        //
+        // So since umask is out, we have to reapply the permissions again,
+        // after the directory was created.
+        let mut dir = match Directory::new(path) {
+            Ok(dir) => dir,
+            Err(e) => {
+                let _ = Directory::remove(path);
+                fail!(from origin, with DirectoryCreateError::UnableToApplyPermissions,
+                    "{msg} since it could not be opened after creation to apply the permissions due to {e:?}.");
+            }
+        };
+
+        if let Err(e) = dir.set_permission(permission) {
+            let _ = Directory::remove(path);
+            fail!(from origin, with DirectoryCreateError::UnableToApplyPermissions,
+                    "{msg} since the permissions could not be applied due to {e:?}.");
+        };
+
+        trace!(from dir, "created with permissions \"{permission}\"");
         Ok(())
     }
 
@@ -319,10 +355,7 @@ impl Directory {
         }
 
         match Directory::new(path) {
-            Ok(d) => {
-                trace!(from d, "created");
-                Ok(d)
-            }
+            Ok(d) => Ok(d),
             Err(e) => {
                 fail!(from origin, with e.into(),
                     "Failed to open newly created directory \"{}\".", path);

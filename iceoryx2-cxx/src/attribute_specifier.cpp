@@ -11,6 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 #include "iox2/attribute_specifier.hpp"
+#include "iox2/bb/expected.hpp"
 
 namespace iox2 {
 AttributeSpecifier::AttributeSpecifier() {
@@ -37,12 +38,13 @@ auto AttributeSpecifier::operator=(AttributeSpecifier&& rhs) noexcept -> Attribu
 }
 
 auto AttributeSpecifier::define(const Attribute::Key& key, const Attribute::Value& value)
-    -> iox::expected<void, AttributeDefinitionError> {
-    auto result = iox2_attribute_specifier_define(&m_handle, key.c_str(), value.c_str());
+    -> bb::Expected<void, AttributeDefinitionError> {
+    auto result =
+        iox2_attribute_specifier_define(&m_handle, key.unchecked_access().c_str(), value.unchecked_access().c_str());
     if (result == IOX2_OK) {
-        return iox::ok();
+        return {};
     }
-    return iox::err(iox::into<AttributeDefinitionError>(result));
+    return bb::err(bb::into<AttributeDefinitionError>(result));
 }
 
 auto AttributeSpecifier::attributes() const -> AttributeSetView {

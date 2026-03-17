@@ -15,16 +15,16 @@
 #![allow(unused_variables)]
 
 use crate::{
-    posix::MemZeroedStruct,
-    posix::{self},
     posix::{
+        self,
         types::*,
-        win32_handle_translator::{FdHandleEntry, HandleTranslator},
+        win32_handle_translator::{DirectoryHandle, FdHandleEntry, HandleTranslator},
+        MemZeroedStruct,
     },
     win32call,
 };
-use core::sync::atomic::Ordering;
-use iceoryx2_pal_concurrency_sync::iox_atomic::IoxAtomicU64;
+use iceoryx2_pal_concurrency_sync::atomic::AtomicU64;
+use iceoryx2_pal_concurrency_sync::atomic::Ordering;
 use iceoryx2_pal_configuration::PATH_LENGTH;
 use windows_sys::Win32::{
     Foundation::{
@@ -119,20 +119,24 @@ pub unsafe fn mkdir(pathname: *const c_char, mode: mode_t) -> int {
 }
 
 pub unsafe fn opendir(dirname: *const c_char) -> *mut DIR {
-    static COUNT: IoxAtomicU64 = IoxAtomicU64::new(1);
+    static COUNT: AtomicU64 = AtomicU64::new(1);
     let id = COUNT.fetch_add(1, Ordering::Relaxed);
 
-    HandleTranslator::get_instance().add(FdHandleEntry::DirectoryStream(id));
+    HandleTranslator::get_instance().add(FdHandleEntry::DirectoryStream(DirectoryHandle { id }));
     id as *mut DIR
 }
 
 pub unsafe fn closedir(dirp: *mut DIR) -> int {
-    HandleTranslator::get_instance().remove_entry(FdHandleEntry::DirectoryStream(dirp as u64));
+    HandleTranslator::get_instance().remove_entry(FdHandleEntry::DirectoryStream(
+        DirectoryHandle::from_id(dirp as u64),
+    ));
     0
 }
 
 pub unsafe fn dirfd(dirp: *mut DIR) -> int {
-    HandleTranslator::get_instance().get_fd(FdHandleEntry::DirectoryStream(dirp as u64))
+    HandleTranslator::get_instance().get_fd(FdHandleEntry::DirectoryStream(
+        DirectoryHandle::from_id(dirp as u64),
+    ))
 }
 
 pub fn dirent_size() -> usize {

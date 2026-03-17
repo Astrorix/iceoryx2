@@ -10,119 +10,81 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-#[cfg(feature = "libc_platform")]
-fn main() {}
+const ENV_PLATFORM_PATH: &str = "IOX2_CUSTOM_POSIX_PLATFORM_PATH";
+const BINDGEN_PLATFORMS: &[&str] = &["windows", "macos", "freebsd", "nto"];
+const LIBC_PLATFORMS: &[&str] = &["android", "linux", "vxworks"];
 
-#[cfg(not(feature = "libc_platform"))]
 fn main() {
-    // needed for bazel but can be empty for cargo builds
-    println!("cargo:rustc-env=BAZEL_BINDGEN_PATH_CORRECTION=");
-
-    // #[cfg(any(...))] does not work when cross-compiling
-    // when cross compiling, 'target_os' is set to the environment the build script
-    // is executed; to get the actual target OS, use the cargo 'TARGET' env variable
+    // when cross compiling, 'CARGO_CFG_TARGET_OS' is set to the compilation
+    // target in the environment of the build script
+    //
+    // #[cfg(any(...))] cannot be used for this purpose as it refers to the
+    // (cross-) compilation host
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
-    println!("Building for target: {}", target_os);
 
-    // the check for 'android' in the next line refers to native compilation
-    // and prevents to pull in bindgen
-    #[cfg(not(target_os = "android"))]
-    // the check for 'android' in the next line refers to cross compilation
-    if target_os != "android" {
-        extern crate bindgen;
-        extern crate cc;
+    // define bazel_build as a valid cfg to avoid errors/warnings, but not used for cargo builds
+    println!("cargo:rustc-check-cfg=cfg(bazel_build)");
 
-        use bindgen::*;
-        use std::env;
-        use std::path::PathBuf;
+    configure_platform_override();
+    configure_platform_binding(&target_os);
 
-        if target_os == "linux" || target_os == "freebsd" {
-            println!("cargo:rustc-link-lib=pthread");
-        }
-
-        println!("cargo:rerun-if-changed=src/c/posix.h");
-
-        let mut builder = bindgen::Builder::default()
-            .header("src/c/posix.h")
-            .blocklist_type("max_align_t")
-            .parse_callbacks(Box::new(CargoCallbacks::new()))
-            .use_core();
-
-        if std::env::var("DOCS_RS").is_ok() {
-            builder = builder.clang_arg("-D IOX2_DOCS_RS_SUPPORT");
-        }
-
-        if target_os == "nto" {
-            let target_arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap();
-            let target_env = std::env::var("CARGO_CFG_TARGET_ENV").unwrap();
-
-            // Common compiler defines for QNX
-            let mut compiler_args = vec![
-                "-D__QNXNTO__",
-                "-D__NO_INLINE__",
-                "-D__DEPRECATED",
-                "-D__unix__",
-                "-D__unix",
-                "-D__ELF__",
-                "-D__LITTLEENDIAN__",
-            ];
-
-            // Version-specific compiler defines for QNX
-            match target_env.as_str() {
-                "nto71" => {
-                    compiler_args.push("-D__QNX__");
-                    compiler_args.push("-D__GNUC__=8");
-                    compiler_args.push("-D__GNUC_MINOR__=3");
-                    compiler_args.push("-D__GNUC_PATCHLEVEL__=0");
-                }
-                "nto80" => {
-                    compiler_args.push("-D__QNX__=800");
-                    compiler_args.push("-D__GNUC__=12");
-                    compiler_args.push("-D__GNUC_MINOR__=2");
-                    compiler_args.push("-D__GNUC_PATCHLEVEL__=0");
-                }
-                _ => {
-                    panic!(
-                    "Unsupported QNX target environment: {target_env}. Only nto71 and nto80 are supported.",
-                );
-                }
-            }
-
-            // Architecture-specific compiler defines for QNX
-            if target_arch == "x86_64" {
-                compiler_args.push("-D__X86_64__");
-            }
-
-            for arg in &compiler_args {
-                builder = builder.clang_arg(*arg);
-            }
-
-            if let Ok(sysroot) = env::var("QNX_TARGET") {
-                builder = builder.clang_arg(format!("--sysroot={sysroot}"));
-                builder = builder.clang_arg(format!("-I{sysroot}/usr/include"));
-                builder = builder.clang_arg(format!("-I{sysroot}/usr/include/c++/v1"));
-            } else {
-                panic!("QNX_TARGET environment variable not set for QNX build")
-            }
-        }
-
-        let bindings = builder.generate().expect("Unable to generate bindings");
-
-        let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
-        bindings
-            .write_to_file(out_path.join("posix_generated.rs"))
-            .expect("Couldn't write bindings!");
-
-        println!("cargo:rerun-if-changed=src/c/socket_macros.c");
-        cc::Build::new()
-            .file("src/c/socket_macros.c")
-            .compile("libsocket_macros.a");
-    }
-
-    if target_os == "android" {
-        // for Android a libc base platform abstraction is used;
-        // to simplify the build process, the 'libc_platform' feature flag is set here
-        // instead of requiring the user to set it
-        println!("cargo::rustc-cfg=feature=\"libc_platform\"");
+    // the cfg guard below refers to native compilation of build.rs and prevents
+    // bindgen from being pulled in as a dependency when a (cross-) compilation
+    // host does not support it
+    //
+    // the target_os check refers for the target compilation which could be
+    // a different platform
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "windows",
+        target_os = "macos",
+        target_os = "freebsd",
+        target_os = "nto"
+    ))]
+    if BINDGEN_PLATFORMS.contains(&target_os.as_str()) {
+        bindgen::run(target_os.as_str());
     }
 }
+
+fn configure_platform_override() {
+    println!("cargo:rustc-check-cfg=cfg(platform_override)");
+
+    if let Ok(platform_path) = std::env::var(ENV_PLATFORM_PATH) {
+        let module_path = std::path::Path::new(&platform_path).join("os.rs");
+        if !module_path.exists() {
+            panic!("The path '{platform_path}' does not contain an 'os.rs' file");
+        }
+
+        println!(
+            "cargo:warning=Building with custom POSIX abstraction at: {}",
+            platform_path
+        );
+
+        println!("cargo:rustc-cfg=platform_override");
+        println!("cargo:rustc-env={}={}", ENV_PLATFORM_PATH, platform_path);
+        println!("cargo:rerun-if-env-changed={}", ENV_PLATFORM_PATH);
+        println!("cargo:rerun-if-changed={}", platform_path);
+    }
+}
+
+fn configure_platform_binding(target_os: &str) {
+    println!("cargo:rustc-check-cfg=cfg(platform_binding, values(\"libc\", \"bindgen\"))");
+    if BINDGEN_PLATFORMS.contains(&target_os) {
+        println!("cargo:rustc-cfg=platform_binding=\"bindgen\"");
+    }
+    if LIBC_PLATFORMS.contains(&target_os) {
+        println!("cargo:rustc-cfg=platform_binding=\"libc\"");
+    }
+}
+
+// the cfg guard below refers to native compilation of build.rs and prevents
+// bindgen from being pulled in as a dependency when a (cross-) compilation
+// host does not support it
+#[cfg(any(
+    target_os = "linux",
+    target_os = "windows",
+    target_os = "macos",
+    target_os = "freebsd",
+    target_os = "nto"
+))]
+mod bindgen;

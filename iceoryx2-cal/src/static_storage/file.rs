@@ -15,6 +15,8 @@
 //! # Example
 //!
 //! ```
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_system_types::file_name::FileName;
 //! use iceoryx2_bb_system_types::path::Path;
 //! use iceoryx2_bb_container::semantic_string::SemanticString;
@@ -44,7 +46,7 @@
 //! println!("Storage {} content: {}", reader.name(), content);
 //! ```
 
-use core::sync::atomic::Ordering;
+use iceoryx2_bb_concurrency::atomic::Ordering;
 
 use alloc::format;
 use alloc::vec;
@@ -53,14 +55,27 @@ use alloc::vec::Vec;
 pub use crate::named_concept::*;
 pub use crate::static_storage::*;
 
-use iceoryx2_bb_log::{fail, trace, warn};
+use iceoryx2_bb_concurrency::atomic::AtomicBool;
 use iceoryx2_bb_posix::adaptive_wait::AdaptiveWaitBuilder;
 use iceoryx2_bb_posix::{
     directory::*, file::*, file_descriptor::FileDescriptorManagement, file_type::FileType,
 };
-use iceoryx2_pal_concurrency_sync::iox_atomic::IoxAtomicBool;
+use iceoryx2_log::{fail, trace, warn};
 
+#[cfg(not(feature = "dev_permissions"))]
 const FINAL_PERMISSIONS: Permission = Permission::OWNER_READ;
+
+#[cfg(not(feature = "dev_permissions"))]
+const DIR_PERMISSIONS: Permission = Permission::OWNER_ALL
+    .const_bitor(Permission::GROUP_READ)
+    .const_bitor(Permission::GROUP_EXEC);
+
+#[cfg(feature = "dev_permissions")]
+const FINAL_PERMISSIONS: Permission = Permission::OWNER_READ
+    .const_bitor(Permission::GROUP_READ)
+    .const_bitor(Permission::OTHERS_READ);
+#[cfg(feature = "dev_permissions")]
+const DIR_PERMISSIONS: Permission = Permission::ALL;
 
 /// The custom configuration of the [`Storage`].
 #[derive(Clone, Debug)]
@@ -153,7 +168,7 @@ impl StaticStorageLocked<Storage> for Locked {
 pub struct Storage {
     name: FileName,
     config: Configuration,
-    has_ownership: IoxAtomicBool,
+    has_ownership: AtomicBool,
     file: File,
     len: u64,
 }
@@ -201,20 +216,26 @@ impl crate::named_concept::NamedConceptMgmt for Storage {
             }
         };
 
-        fail!(from origin, when file.set_permission(Permission::OWNER_ALL),
-                with NamedConceptRemoveError::InternalError,
-                "{} since the permissions could not be adjusted.", msg);
+        let set_permission_result = file.set_permission(Permission::ALL);
 
         match File::remove(&file_path) {
             Ok(v) => Ok(v),
-            Err(FileRemoveError::InsufficientPermissions)
-            | Err(FileRemoveError::PartOfReadOnlyFileSystem) => {
-                fail!(from origin, with NamedConceptRemoveError::InsufficientPermissions,
-                        "{} due to insufficient permissions.", msg);
-            }
-            Err(v) => {
-                fail!(from origin, with NamedConceptRemoveError::InternalError,
-                        "{} due to unknown failure ({:?}).", msg, v);
+            Err(e) => {
+                if let Err(e) = set_permission_result {
+                    warn!(from origin,
+                          "Unable to adjust the files permission as preparation to remove the file ({e:?}).");
+                }
+                match e {
+                    FileRemoveError::InsufficientPermissions
+                    | FileRemoveError::PartOfReadOnlyFileSystem => {
+                        fail!(from origin, with NamedConceptRemoveError::InsufficientPermissions,
+                                "{} due to insufficient permissions.", msg);
+                    }
+                    _ => {
+                        fail!(from origin, with NamedConceptRemoveError::InternalError,
+                                "{} due to unknown failure ({:?}).", msg, e);
+                    }
+                }
             }
         }
     }
@@ -385,14 +406,12 @@ impl crate::static_storage::StaticStorageBuilder<Storage> for Builder {
     }
 
     fn create_locked(self) -> Result<Locked, StaticStorageCreateError> {
-        let directory_permission = Permission::OWNER_ALL | Permission::GROUP_ALL;
-
         let msg = format!("Unable to create target directory \"{}\"", self.config.path);
         if !fail!(from self, when Directory::does_exist(&self.config.path),
             with StaticStorageCreateError::Creation,
                "{} since the system is unable to determine if the directory even exists.", msg)
         {
-            match Directory::create(&self.config.path, directory_permission) {
+            match Directory::create(&self.config.path, DIR_PERMISSIONS) {
                 Ok(_) | Err(DirectoryCreateError::DirectoryAlreadyExists) => (),
                 Err(e) => {
                     fail!(from self, with StaticStorageCreateError::Creation,
@@ -416,7 +435,7 @@ impl crate::static_storage::StaticStorageBuilder<Storage> for Builder {
             static_storage: Storage {
                 name: self.storage_name,
                 config: self.config,
-                has_ownership: IoxAtomicBool::new(self.has_ownership),
+                has_ownership: AtomicBool::new(self.has_ownership),
                 file,
                 len: 0,
             },
@@ -460,7 +479,7 @@ impl crate::static_storage::StaticStorageBuilder<Storage> for Builder {
                 return Ok(Storage {
                     name: self.storage_name,
                     config: self.config,
-                    has_ownership: IoxAtomicBool::new(self.has_ownership),
+                    has_ownership: AtomicBool::new(self.has_ownership),
                     file,
                     len: metadata.size(),
                 });

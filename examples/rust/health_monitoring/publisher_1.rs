@@ -17,12 +17,12 @@ use alloc::boxed::Box;
 
 use examples_common::{open_service, PubSubEvent};
 use iceoryx2::prelude::*;
-use iceoryx2_bb_log::cout;
 
 const CYCLE_TIME: Duration = Duration::from_millis(1000);
 
 fn main() -> Result<(), Box<dyn core::error::Error>> {
     set_log_level_from_env_or(LogLevel::Info);
+
     let service_name = ServiceName::new("service_1")?;
     let node = NodeBuilder::new()
         .name(&"publisher 1".try_into()?)
@@ -46,7 +46,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
     let _cycle_guard = waitset.attach_interval(CYCLE_TIME);
 
     waitset.wait_and_process(|_| {
-        cout!("{service_name}: Send sample {counter} ...");
+        coutln!("{service_name}: Send sample {counter} ...");
         publisher
             .send_copy(counter)
             .expect("sample delivery successful.");
@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
         CallbackProgression::Continue
     })?;
 
-    cout!("exit");
+    coutln!("exit");
 
     Ok(())
 }

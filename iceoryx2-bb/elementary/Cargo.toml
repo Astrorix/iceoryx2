@@ -10,13 +10,25 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 version = { workspace = true }
 
+[lints]
+workspace = true
+
+[features]
+default = []
+
+std = [
+  "iceoryx2-pal-concurrency-sync/std",
+]
+
 [dependencies]
 iceoryx2-bb-elementary-traits = { workspace = true }
 iceoryx2-pal-concurrency-sync = { workspace = true }
 
 [dev-dependencies]
+iceoryx2-bb-elementary-tests-common = { workspace = true, features = ["std"] }
+iceoryx2-bb-loggers = { workspace = true }
 iceoryx2-bb-testing = { workspace = true }
-iceoryx2-pal-testing = { workspace = true }
+iceoryx2-bb-testing-nostd-macros = { workspace = true }
+iceoryx2-bb-testing-nostd = { workspace = true }
 
 generic-tests = { workspace = true }
-

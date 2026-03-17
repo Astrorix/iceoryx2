@@ -14,7 +14,8 @@
 #![allow(clippy::missing_safety_doc)]
 #![allow(unused_variables)]
 
-use iceoryx2_pal_concurrency_sync::mutex::Mutex;
+use iceoryx2_pal_concurrency_sync::cell::UnsafeCell;
+use iceoryx2_pal_concurrency_sync::strategy::mutex::Mutex;
 use iceoryx2_pal_concurrency_sync::WaitAction;
 use windows_sys::Win32::{
     Foundation::{FALSE, TRUE},
@@ -26,8 +27,6 @@ use windows_sys::Win32::{
         Threading::{GetExitCodeProcess, OpenProcess, PROCESS_ALL_ACCESS},
     },
 };
-
-use core::cell::UnsafeCell;
 
 use crate::{
     posix::getpid,
@@ -200,4 +199,8 @@ pub unsafe fn sigemptyset(set: *mut sigset_t) -> int {
 
 pub unsafe fn sigpending(set: *mut sigset_t) -> int {
     unimplemented!("Windows does not support the sigset_t.");
+}
+
+pub unsafe fn abort() {
+    unimplemented!("abort")
 }

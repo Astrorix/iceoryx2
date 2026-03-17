@@ -70,6 +70,9 @@ pub struct DiscoveryOptions {
     )]
     pub rate: u64,
 
+    #[clap(long, help = "Show detailed information about discovered services")]
+    pub detailed: bool,
+
     #[clap(long, help = "Do not publish discovered services")]
     pub disable_publish: bool,
 
@@ -190,7 +193,7 @@ impl From<MessagingPattern> for iceoryx2::prelude::MessagingPattern {
 
 #[derive(Parser)]
 pub struct PublishOptions {
-    #[clap(help = "Name of the service which shall the message be sent to.")]
+    #[clap(help = "Name of the service which the message shall be sent to.")]
     pub service: String,
     #[clap(
         short,
@@ -372,6 +375,32 @@ pub struct RecordOptions {
 }
 
 #[derive(Parser)]
+pub struct HzOptions {
+    #[clap(help = "Name of the service to measure the message frequency of.")]
+    pub service: String,
+    #[clap(
+        short,
+        long,
+        default_value = "iox2-cli-service-hz",
+        help = "Defines the node name of the hz measurement endpoint."
+    )]
+    pub node_name: String,
+    #[clap(
+        short,
+        long,
+        default_value = "10000",
+        help = "Rolling window size, in # of messages, for calculating rate (default: 10000)."
+    )]
+    pub window: usize,
+    #[clap(
+        short,
+        long,
+        help = "Maximum runtime in seconds. When the timeout has passed the process stops."
+    )]
+    pub timeout: Option<u64>,
+}
+
+#[derive(Parser)]
 pub struct ReplayOptions {
     #[clap(help = "When provided, it overrides the service name of the record file.")]
     pub service: Option<String>,
@@ -467,4 +496,9 @@ pub enum Action {
         help_template = help_template(HelpOptions::DontPrintCommandSection)
     )]
     Replay(ReplayOptions),
+    #[clap(
+        about = "Measure the message frequency (Hz) of a publish-subscribe service.",
+        help_template = help_template(HelpOptions::DontPrintCommandSection)
+    )]
+    Hz(HzOptions),
 }

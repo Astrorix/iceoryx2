@@ -30,9 +30,8 @@ class CustomPublisher : public iox2::FileDescriptorBased {
     CustomPublisher(CustomPublisher&&) = default;
     ~CustomPublisher() override {
         m_notifier
-            .notify_with_custom_event_id(
-                iox2::EventId(iox::from<PubSubEvent, size_t>(PubSubEvent::PublisherDisconnected)))
-            .expect("");
+            .notify_with_custom_event_id(iox2::EventId(iox2::bb::into<size_t>(PubSubEvent::PublisherDisconnected)))
+            .value();
     }
 
     static auto create(iox2::Node<iox2::ServiceType::Ipc>& node, const iox2::ServiceName& service_name)
@@ -42,16 +41,15 @@ class CustomPublisher : public iox2::FileDescriptorBased {
                                   .history_size(HISTORY_SIZE)
                                   .subscriber_max_buffer_size(HISTORY_SIZE)
                                   .open_or_create()
-                                  .expect("");
-        auto event_service = node.service_builder(service_name).event().open_or_create().expect("");
+                                  .value();
+        auto event_service = node.service_builder(service_name).event().open_or_create().value();
 
-        auto notifier = event_service.notifier_builder().create().expect("");
-        auto listener = event_service.listener_builder().create().expect("");
-        auto publisher = pubsub_service.publisher_builder().create().expect("");
+        auto notifier = event_service.notifier_builder().create().value();
+        auto listener = event_service.listener_builder().create().value();
+        auto publisher = pubsub_service.publisher_builder().create().value();
 
-        notifier
-            .notify_with_custom_event_id(iox2::EventId(iox::from<PubSubEvent, size_t>(PubSubEvent::PublisherConnected)))
-            .expect("");
+        notifier.notify_with_custom_event_id(iox2::EventId(iox2::bb::into<size_t>(PubSubEvent::PublisherConnected)))
+            .value();
 
         return CustomPublisher { std::move(publisher), std::move(listener), std::move(notifier) };
     }
@@ -63,14 +61,12 @@ class CustomPublisher : public iox2::FileDescriptorBased {
     void handle_event() {
         for (auto event = m_listener.try_wait_one(); event.has_value() && event->has_value();
              event = m_listener.try_wait_one()) {
-            switch (iox::from<size_t, PubSubEvent>(event.value()->as_value())) {
+            switch (iox2::bb::into<PubSubEvent>(event.value()->as_value())) {
             case PubSubEvent::SubscriberConnected: {
                 std::cout << "new subscriber connected - delivering history" << std::endl;
-                m_publisher.update_connections().expect("");
-                m_notifier
-                    .notify_with_custom_event_id(
-                        iox2::EventId(iox::from<PubSubEvent, size_t>(PubSubEvent::SentHistory)))
-                    .expect("");
+                m_publisher.update_connections().value();
+                m_notifier.notify_with_custom_event_id(iox2::EventId(iox2::bb::into<size_t>(PubSubEvent::SentHistory)))
+                    .value();
                 break;
             }
             case PubSubEvent::SubscriberDisconnected: {
@@ -90,13 +86,12 @@ class CustomPublisher : public iox2::FileDescriptorBased {
 
     void send(const uint64_t counter) {
         constexpr double SOME_NUMBER = 812.12;
-        auto sample = m_publisher.loan_uninit().expect("");
+        auto sample = m_publisher.loan_uninit().value();
         auto initialized_sample = sample.write_payload(TransmissionData {
             static_cast<int32_t>(counter), static_cast<int32_t>(counter), static_cast<double>(counter) * SOME_NUMBER });
-        ::iox2::send(std::move(initialized_sample)).expect("");
+        ::iox2::send(std::move(initialized_sample)).value();
 
-        m_notifier.notify_with_custom_event_id(iox2::EventId(iox::from<PubSubEvent, size_t>(PubSubEvent::SentSample)))
-            .expect("");
+        m_notifier.notify_with_custom_event_id(iox2::EventId(iox2::bb::into<size_t>(PubSubEvent::SentSample))).value();
     }
 
     auto operator=(const CustomPublisher&) -> CustomPublisher& = delete;

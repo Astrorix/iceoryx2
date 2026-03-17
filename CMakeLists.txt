@@ -12,7 +12,7 @@
 
 cmake_minimum_required(VERSION 3.16)
 
-set(IOX2_VERSION 0.7.0)
+set(IOX2_VERSION 0.8.999)
 project(iceoryx2-workspace VERSION ${IOX2_VERSION})
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # "Create compile_commands.json file"
@@ -65,38 +65,73 @@ add_param(
 message(STATUS "[i] iceoryx2 dev setup Rust feature flags (only used when 'RUST_BUILD_ARTIFACT_PATH' is not set):")
 
 add_rust_feature(
+    NAME IOX2_FEATURE_STD
+    DESCRIPTION "Build iceoryx2 with std library"
+    DEFAULT_VALUE ON
+    RUST_FEATURE "iceoryx2-ffi-c/std"
+)
+
+add_rust_feature(
     NAME IOX2_FEATURE_DEV_PERMISSIONS
-    DESCRIPTION "The permissions of all resources will be set to read, write, execute for everyone."
+    DESCRIPTION "The permissions of all resources will be set to read, write, execute for everyone"
     DEFAULT_VALUE OFF
     RUST_FEATURE "iceoryx2/dev_permissions"
 )
 
 add_rust_feature(
-    NAME IOX2_FEATURE_LIBC_PLATFORM
-    DESCRIPTION "A platform abstraction based on the libc crate, eliminating the need for bindgen. Only available on Linux."
+    NAME IOX2_FEATURE_LOGGER_STD
+    DESCRIPTION "Use the std module in the logger backend"
+    DEFAULT_VALUE ON
+    RUST_FEATURE "iceoryx2-bb-loggers/std"
+)
+
+add_rust_feature(
+    NAME IOX2_FEATURE_LOGGER_POSIX
+    DESCRIPTION "Use the POSIX abstraction in the logger backend"
     DEFAULT_VALUE OFF
-    RUST_FEATURE "iceoryx2/libc_platform"
+    RUST_FEATURE "iceoryx2-bb-loggers/posix"
+)
+
+add_rust_feature(
+    NAME IOX2_FEATURE_LOGGER_BARE_METAL
+    DESCRIPTION "Use bare metal abstractions in the logger backend"
+    DEFAULT_VALUE OFF
+    RUST_FEATURE "iceoryx2-bb-loggers/bare_metal"
+)
+
+add_rust_feature(
+    NAME IOX2_FEATURE_LOGGER_BUFFER
+    DESCRIPTION "Sets the buffer logger as the default logger backend"
+    DEFAULT_VALUE OFF
+    RUST_FEATURE "iceoryx2-bb-loggers/buffer"
+)
+
+add_rust_feature(
+    NAME IOX2_FEATURE_LOGGER_CONSOLE
+    DESCRIPTION "Sets the console logger as the default logger backend"
+    DEFAULT_VALUE ON
+    RUST_FEATURE "iceoryx2-bb-loggers/console"
+)
+
+add_rust_feature(
+    NAME IOX2_FEATURE_LOGGER_FILE
+    DESCRIPTION "Sets the file logger as the default logger backend"
+    DEFAULT_VALUE OFF
+    RUST_FEATURE "iceoryx2-bb-loggers/file"
 )
 
 add_rust_feature(
     NAME IOX2_FEATURE_LOGGER_LOG
     DESCRIPTION "Enables https://crates.io/crates/log as default logger"
     DEFAULT_VALUE OFF
-    RUST_FEATURE "iceoryx2/logger_log"
+    RUST_FEATURE "iceoryx2-bb-loggers/log"
 )
 
 add_rust_feature(
     NAME IOX2_FEATURE_LOGGER_TRACING
     DESCRIPTION "Enables https://crates.io/crates/tracing as default logger"
     DEFAULT_VALUE OFF
-    RUST_FEATURE "iceoryx2/logger_tracing"
-)
-
-add_rust_feature(
-    NAME IOX2_CUSTOM_PAL_CONFIG
-    DESCRIPTION "Uses a custom Platform Abstraction Layer Config defined in the 'IOX2_CUSTOM_PAL_CONFIG_PATH' env variable"
-    DEFAULT_VALUE OFF
-    RUST_FEATURE "iceoryx2/custom_pal_config"
+    RUST_FEATURE "iceoryx2-bb-loggers/tracing"
 )
 
 # END Options, Params and Feature Flags
@@ -154,7 +189,7 @@ else()
     # run cargo
     add_custom_target(
         iceoryx2-ffi-c-build-step ALL
-        COMMAND cargo build ${RUST_BUILD_TYPE_FLAG} ${RUST_FEATURE_FLAGS} --package iceoryx2-ffi-c --target-dir=${RUST_TARGET_DIR} ${RUST_TARGET_TRIPLET_FLAG}
+        COMMAND cargo build ${RUST_BUILD_TYPE_FLAG} --no-default-features ${RUST_FEATURE_FLAGS} --package iceoryx2-ffi-c --target-dir=${RUST_TARGET_DIR} ${RUST_TARGET_TRIPLET_FLAG}
         BYPRODUCTS
             ${ICEORYX2_C_INCLUDE_DIR}/iox2/iceoryx2.h
             ${ICEORYX2_C_STATIC_LIB_LINK_FILE}
@@ -172,20 +207,16 @@ endif()
 
 # END C binding
 
-
 if(BUILD_EXAMPLES)
     add_subdirectory(examples/c)
 endif()
 
 
 if(BUILD_CXX)
-    # C++ containers
+    # C++ containers and building blocks
     add_subdirectory(iceoryx2-bb/cxx)
 
     # C++ binding
-    set(ICEORYX_HOOFS_VERSION 2.95.8)
-    include(${CMAKE_CURRENT_LIST_DIR}/iceoryx2-cxx/cmake/fetch-iceoryx-hoofs.cmake)
-
     add_subdirectory(iceoryx2-cxx)
 
     if(BUILD_EXAMPLES)

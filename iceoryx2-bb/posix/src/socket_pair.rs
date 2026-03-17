@@ -17,6 +17,8 @@
 //! # Example
 //!
 //! ```
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_posix::socket_pair::*;
 //!
 //! let (socket_1, socket_2) = StreamingSocket::create_pair().unwrap();
@@ -26,10 +28,11 @@
 //! buffer.resize(128, 0);
 //! socket_2.try_receive(&mut buffer).unwrap();
 //! ```
-use core::sync::atomic::Ordering;
 use core::time::Duration;
-use iceoryx2_bb_log::fail;
-use iceoryx2_pal_concurrency_sync::iox_atomic::IoxAtomicBool;
+use iceoryx2_bb_concurrency::atomic::AtomicBool;
+use iceoryx2_bb_concurrency::atomic::Ordering;
+use iceoryx2_bb_elementary::enum_gen;
+use iceoryx2_log::fail;
 use iceoryx2_pal_posix::posix::{self, Errno};
 
 use crate::{
@@ -41,14 +44,15 @@ use crate::{
 
 const BLOCKING_TIMEOUT: Duration = Duration::from_secs(i16::MAX as _);
 
-/// Defines the errors that can occur when a socket pair is created with
-/// [`StreamingSocket::create_pair()`].
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum StreamingSocketDuplicateError {
+enum_gen! {
+    /// Defines the errors that can occur when a socket pair is created with
+    /// [`StreamingSocket::create_pair()`].
+    StreamingSocketDuplicateError
+  entry:
     PerProcessFileHandleLimitReached,
     Interrupt,
     FileDescriptorBroken,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
 impl From<FcntlError> for StreamingSocketDuplicateError {
@@ -60,18 +64,11 @@ impl From<FcntlError> for StreamingSocketDuplicateError {
     }
 }
 
-impl core::fmt::Display for StreamingSocketDuplicateError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "StreamingSocketDuplicateError::{self:?}")
-    }
-}
-
-impl core::error::Error for StreamingSocketDuplicateError {}
-
-/// Defines the errors that can occur when a socket pair is created with
-/// [`StreamingSocket::create_pair()`].
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum StreamingSocketPairCreationError {
+enum_gen! {
+    /// Defines the errors that can occur when a socket pair is created with
+    /// [`StreamingSocket::create_pair()`].
+    StreamingSocketPairCreationError
+  entry:
     FileDescriptorBroken,
     PerProcessFileHandleLimitReached,
     SystemWideFileHandleLimitReached,
@@ -79,7 +76,7 @@ pub enum StreamingSocketPairCreationError {
     InsufficientResources,
     InsufficientMemory,
     Interrupt,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
 impl From<FcntlError> for StreamingSocketPairCreationError {
@@ -91,39 +88,32 @@ impl From<FcntlError> for StreamingSocketPairCreationError {
     }
 }
 
-impl core::fmt::Display for StreamingSocketPairCreationError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "StreamingSocketPairCreationError::{self:?}")
-    }
-}
-
-impl core::error::Error for StreamingSocketPairCreationError {}
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-enum FcntlError {
+enum_gen! { FcntlError
+  entry:
     Interrupt,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-enum SetSockoptError {
+enum_gen! { SetSockoptError
+  entry:
     InsufficientResources,
     InsufficientMemory,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
-/// Defines the errors that can occur when a [`StreamingSocket`] sends data via
-/// * [`StreamingSocket::try_send()`]
-/// * [`StreamingSocket::timed_send()`]
-/// * [`StreamingSocket::blocking_send()`]
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum StreamingSocketPairSendError {
+enum_gen! {
+    /// Defines the errors that can occur when a [`StreamingSocket`] sends data via
+    /// * [`StreamingSocket::try_send()`]
+    /// * [`StreamingSocket::timed_send()`]
+    /// * [`StreamingSocket::blocking_send()`]
+    StreamingSocketPairSendError
+  entry:
     InsufficientMemory,
     InsufficientResources,
     Interrupt,
     ConnectionReset,
     Disconnected,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
 impl From<SetSockoptError> for StreamingSocketPairSendError {
@@ -147,26 +137,19 @@ impl From<FcntlError> for StreamingSocketPairSendError {
     }
 }
 
-impl core::fmt::Display for StreamingSocketPairSendError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "StreamingSocketPairSendError::{self:?}")
-    }
-}
-
-impl core::error::Error for StreamingSocketPairSendError {}
-
-/// Defines the errors that can occur when a [`StreamingSocket`] receives data via
-/// * [`StreamingSocket::try_receive()`]
-/// * [`StreamingSocket::timed_receive()`]
-/// * [`StreamingSocket::blocking_receive()`]
-/// * [`StreamingSocket::peek()`]
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum StreamingSocketPairReceiveError {
+enum_gen! {
+    /// Defines the errors that can occur when a [`StreamingSocket`] receives data via
+    /// * [`StreamingSocket::try_receive()`]
+    /// * [`StreamingSocket::timed_receive()`]
+    /// * [`StreamingSocket::blocking_receive()`]
+    /// * [`StreamingSocket::peek()`]
+    StreamingSocketPairReceiveError
+  entry:
     InsufficientMemory,
     InsufficientResources,
     ConnectionReset,
     Interrupt,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
 impl From<FcntlError> for StreamingSocketPairReceiveError {
@@ -192,19 +175,11 @@ impl From<SetSockoptError> for StreamingSocketPairReceiveError {
     }
 }
 
-impl core::fmt::Display for StreamingSocketPairReceiveError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "StreamingSocketPairReceiveError::{self:?}")
-    }
-}
-
-impl core::error::Error for StreamingSocketPairReceiveError {}
-
 /// A single socket in a [`StreamingSocket`] pair.
 #[derive(Debug)]
 pub struct StreamingSocket {
     file_descriptor: FileDescriptor,
-    is_non_blocking: IoxAtomicBool,
+    is_non_blocking: AtomicBool,
 }
 
 impl FileDescriptorBased for StreamingSocket {
@@ -253,13 +228,13 @@ impl StreamingSocket {
             let fd_2 = Self::create_type_safe_fd(fd_values[1], origin, msg)?;
             let socket_1 = StreamingSocket {
                 file_descriptor: fd_1,
-                is_non_blocking: IoxAtomicBool::new(false),
+                is_non_blocking: AtomicBool::new(false),
             };
             fail!(from origin, when socket_1.set_non_blocking(true),
                 "{msg} since the first file descriptor of the socket pair could not be set to non-blocking.");
             let socket_2 = StreamingSocket {
                 file_descriptor: fd_2,
-                is_non_blocking: IoxAtomicBool::new(false),
+                is_non_blocking: AtomicBool::new(false),
             };
             fail!(from origin, when socket_2.set_non_blocking(true),
                 "{msg} since the second file descriptor of the socket pair could not be set to non-blocking.");
@@ -285,7 +260,7 @@ impl StreamingSocket {
             let new_socket = StreamingSocket {
                 file_descriptor: Self::create_type_safe_fd(duplicated_fd, origin, msg)
                     .map_err(|_| StreamingSocketDuplicateError::FileDescriptorBroken)?,
-                is_non_blocking: IoxAtomicBool::new(false),
+                is_non_blocking: AtomicBool::new(false),
             };
 
             fail!(from origin, when new_socket.set_non_blocking(true),

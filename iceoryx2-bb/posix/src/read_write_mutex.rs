@@ -17,6 +17,8 @@
 //! # Example
 //!
 //! ```no_run
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_posix::read_write_mutex::*;
 //! use std::thread;
 //! use core::time::Duration;
@@ -49,55 +51,54 @@ pub use crate::ipc_capable::{Handle, IpcCapable};
 
 use core::marker::PhantomData;
 use core::{
-    cell::UnsafeCell,
     fmt::Debug,
     ops::{Deref, DerefMut},
 };
 
 use alloc::format;
 
+use iceoryx2_bb_concurrency::cell::UnsafeCell;
 use iceoryx2_bb_elementary::{enum_gen, scope_guard::ScopeGuardBuilder};
-use iceoryx2_bb_log::{fail, fatal_panic, warn};
+use iceoryx2_log::{fail, fatal_panic, warn};
 use iceoryx2_pal_posix::posix::errno::Errno;
 use iceoryx2_pal_posix::posix::MemZeroedStruct;
 use iceoryx2_pal_posix::*;
 
-use crate::handle_errno;
 use crate::ipc_capable::internal::{Capability, HandleStorage, IpcConstructible};
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum ReadWriteMutexCreationError {
+enum_gen! { ReadWriteMutexCreationError
+  entry:
     InsufficientMemory,
     InsufficientResources,
     InsufficientPermissions,
     NoInterProcessSupport,
     NoMutexKindSupport,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum ReadWriteMutexReadLockError {
+enum_gen! { ReadWriteMutexReadLockError
+  entry:
     MaximumAmountOfReadLocksAcquired,
     DeadlockConditionDetected,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum ReadWriteMutexUnlockError {
+enum_gen! { ReadWriteMutexUnlockError
+  entry:
     OwnedByDifferentEntity,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum ReadWriteMutexWriteLockError {
+enum_gen! { ReadWriteMutexWriteLockError
+  entry:
     DeadlockConditionDetected,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum ReadWriteMutexOpenIpcHandleError {
+enum_gen! { ReadWriteMutexOpenIpcHandleError
+  entry:
     IsNotInterProcessCapable,
-    Uninitialized,
+    Uninitialized
 }
 
 enum_gen! {

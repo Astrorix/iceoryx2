@@ -71,10 +71,16 @@ where
             service_id: config.service_id().as_str().to_string(),
             service_name: config.name().as_str().to_string(),
             attributes: config.attributes().clone(),
-            pattern: config.messaging_pattern().clone(),
+            pattern: *config.messaging_pattern(),
             nodes: service.dynamic_details.as_ref().map(NodeList::from),
         }
     }
+}
+
+#[derive(serde::Serialize)]
+pub enum DiscoveryEvent<T> {
+    Added(T),
+    Removed(T),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize)]

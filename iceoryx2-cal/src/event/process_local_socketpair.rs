@@ -19,7 +19,7 @@ use alloc::vec::Vec;
 pub use iceoryx2_bb_container::semantic_string::SemanticString;
 pub use iceoryx2_bb_system_types::{file_name::FileName, file_path::FilePath, path::Path};
 
-use iceoryx2_bb_log::{debug, fail, fatal_panic};
+use iceoryx2_bb_concurrency::lazy_lock::LazyLock;
 use iceoryx2_bb_posix::{
     file_descriptor::FileDescriptorBased,
     file_descriptor_set::SynchronousMultiplexing,
@@ -29,8 +29,7 @@ use iceoryx2_bb_posix::{
         StreamingSocketPairReceiveError, StreamingSocketPairSendError,
     },
 };
-
-use once_cell::sync::Lazy;
+use iceoryx2_log::{debug, fail, fatal_panic};
 
 use crate::named_concept::{
     NamedConceptConfiguration, NamedConceptDoesExistError, NamedConceptListError,
@@ -49,19 +48,17 @@ struct StorageEntry {
     notifier: StreamingSocket,
 }
 
-static PROCESS_LOCAL_MTX_HANDLE: Lazy<MutexHandle<BTreeMap<FilePath, StorageEntry>>> =
-    Lazy::new(MutexHandle::new);
-static PROCESS_LOCAL_STORAGE: Lazy<Mutex<BTreeMap<FilePath, StorageEntry>>> = Lazy::new(|| {
-    let result = MutexBuilder::new()
-        .is_interprocess_capable(false)
-        .create(BTreeMap::new(), &PROCESS_LOCAL_MTX_HANDLE);
+static PROCESS_LOCAL_MTX_HANDLE: LazyLock<MutexHandle<BTreeMap<FilePath, StorageEntry>>> =
+    LazyLock::new(MutexHandle::new);
 
-    if result.is_err() {
-        fatal_panic!(from "PROCESS_LOCAL_STORAGE", "Failed to create global dynamic storage");
-    }
-
-    result.unwrap()
-});
+static PROCESS_LOCAL_STORAGE: LazyLock<Mutex<'static, 'static, BTreeMap<FilePath, StorageEntry>>> =
+    LazyLock::new(|| {
+        fatal_panic!(from "PROCESS_LOCAL_STORAGE",
+            when MutexBuilder::new()
+                .is_interprocess_capable(false)
+                .create(BTreeMap::new(), &PROCESS_LOCAL_MTX_HANDLE),
+            "Failed to create global dynamic storage")
+    });
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Configuration {

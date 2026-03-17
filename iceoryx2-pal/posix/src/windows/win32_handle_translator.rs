@@ -18,10 +18,12 @@ use windows_sys::Win32::{
 };
 
 use crate::posix::{c_string_length, types::*};
-use core::sync::atomic::Ordering;
-use core::{cell::UnsafeCell, panic};
-use iceoryx2_pal_concurrency_sync::iox_atomic::{IoxAtomicBool, IoxAtomicU32, IoxAtomicUsize};
-use iceoryx2_pal_concurrency_sync::mutex::Mutex;
+use core::fmt::Debug;
+use core::panic;
+use iceoryx2_pal_concurrency_sync::atomic::Ordering;
+use iceoryx2_pal_concurrency_sync::atomic::{AtomicBool, AtomicU32, AtomicUsize};
+use iceoryx2_pal_concurrency_sync::cell::UnsafeCell;
+use iceoryx2_pal_concurrency_sync::strategy::mutex::Mutex;
 use iceoryx2_pal_concurrency_sync::WaitAction;
 
 use super::win32_udp_port_to_uds_name::PortToUds;
@@ -29,25 +31,45 @@ use super::win32_udp_port_to_uds_name::PortToUds;
 const MAX_SUPPORTED_FD_HANDLES: usize = 1024;
 
 #[doc(hidden)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FdHandleEntry {
     SharedMemory(ShmHandle),
     File(FileHandle),
-    DirectoryStream(u64),
+    DirectoryStream(DirectoryHandle),
     Socket(SocketHandle),
     UdsDatagramSocket(UdsDatagramSocketHandle),
     NextFreeFd(usize),
 }
 
 #[doc(hidden)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
+pub struct DirectoryHandle {
+    pub id: u64,
+}
+
+impl DirectoryHandle {
+    pub fn from_id(id: u64) -> Self {
+        DirectoryHandle { id }
+    }
+}
+
+impl PartialEq for DirectoryHandle {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for DirectoryHandle {}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FileHandle {
     pub handle: HANDLE,
     pub lock_state: int,
 }
 
 #[doc(hidden)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ShmHandle {
     pub handle: FileHandle,
     pub state_handle: HANDLE,
@@ -59,6 +81,12 @@ pub struct UdsDatagramSocketHandle {
     pub fd: usize,
     pub address: Option<sockaddr_in>,
     pub recv_timeout: Option<timeval>,
+}
+
+impl Debug for UdsDatagramSocketHandle {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "UdsDatagramSocketHandle {{ fd: {} }}", self.fd)
+    }
 }
 
 impl PartialEq for UdsDatagramSocketHandle {
@@ -95,6 +123,12 @@ pub struct SocketHandle {
     pub send_timeout: Option<timeval>,
 }
 
+impl Debug for SocketHandle {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "SocketHandle {{ fd: {} }}", self.fd)
+    }
+}
+
 impl PartialEq for SocketHandle {
     fn eq(&self, other: &Self) -> bool {
         self.fd == other.fd
@@ -108,7 +142,7 @@ pub struct HandleTranslator {
     fd2handle: [UnsafeCell<FdHandleEntry>; MAX_SUPPORTED_FD_HANDLES],
     free_fd_list_start: UnsafeCell<usize>,
     port_to_uds_translator: UnsafeCell<Option<PortToUds>>,
-    uds_datagram_counter: IoxAtomicUsize,
+    uds_datagram_counter: AtomicUsize,
     mtx: Mutex,
 }
 
@@ -125,14 +159,14 @@ impl HandleTranslator {
             fd2handle: [NEXT_FREE_FD; MAX_SUPPORTED_FD_HANDLES],
             free_fd_list_start: UnsafeCell::new(0),
             port_to_uds_translator: UnsafeCell::new(None),
-            uds_datagram_counter: IoxAtomicUsize::new(0),
+            uds_datagram_counter: AtomicUsize::new(0),
             mtx: Mutex::new(),
         }
     }
 
     pub fn get_instance() -> &'static HandleTranslator {
         static HANDLE_TRANSLATOR: HandleTranslator = HandleTranslator::new();
-        static IS_INITIALIZED: IoxAtomicBool = IoxAtomicBool::new(false);
+        static IS_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
         if !IS_INITIALIZED.load(Ordering::Relaxed) {
             HANDLE_TRANSLATOR.lock();
@@ -155,7 +189,7 @@ impl HandleTranslator {
         self.mtx.lock(|atomic, value| {
             unsafe {
                 WaitOnAddress(
-                    (atomic as *const IoxAtomicU32).cast(),
+                    (atomic as *const AtomicU32).cast(),
                     (value as *const u32).cast(),
                     4,
                     INFINITE,
@@ -167,7 +201,7 @@ impl HandleTranslator {
 
     fn unlock(&self) {
         self.mtx.unlock(|atomic| unsafe {
-            WakeByAddressSingle((atomic as *const IoxAtomicU32).cast());
+            WakeByAddressSingle((atomic as *const AtomicU32).cast());
         });
     }
 

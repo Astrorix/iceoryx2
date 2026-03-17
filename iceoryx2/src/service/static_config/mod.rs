@@ -34,8 +34,8 @@ use alloc::format;
 
 use iceoryx2_bb_derive_macros::ZeroCopySend;
 use iceoryx2_bb_elementary_traits::zero_copy_send::ZeroCopySend;
-use iceoryx2_bb_log::fatal_panic;
 use iceoryx2_cal::hash::Hash;
+use iceoryx2_log::fatal_panic;
 
 use serde::{Deserialize, Serialize};
 
@@ -67,7 +67,7 @@ impl StaticConfig {
                 service_name,
                 crate::service::messaging_pattern::MessagingPattern::RequestResponse,
             ),
-            service_name: service_name.clone(),
+            service_name: *service_name,
             messaging_pattern,
             attributes: AttributeSet::new(),
         }
@@ -83,7 +83,7 @@ impl StaticConfig {
                 service_name,
                 crate::service::messaging_pattern::MessagingPattern::Event,
             ),
-            service_name: service_name.clone(),
+            service_name: *service_name,
             messaging_pattern,
             attributes: AttributeSet::new(),
         }
@@ -100,7 +100,7 @@ impl StaticConfig {
                 service_name,
                 crate::service::messaging_pattern::MessagingPattern::PublishSubscribe,
             ),
-            service_name: service_name.clone(),
+            service_name: *service_name,
             messaging_pattern,
             attributes: AttributeSet::new(),
         }
@@ -116,7 +116,7 @@ impl StaticConfig {
                 service_name,
                 crate::service::messaging_pattern::MessagingPattern::Blackboard,
             ),
-            service_name: service_name.clone(),
+            service_name: *service_name,
             messaging_pattern,
             attributes: AttributeSet::new(),
         }

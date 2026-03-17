@@ -57,7 +57,7 @@ configure_package_config_file(
 
 # target directories
 install(
-    TARGETS iceoryx2-bb-containers-cxx
+    TARGETS iceoryx2-bb-cxx
     EXPORT ${TARGETS_EXPORT_NAME}
     RUNTIME DESTINATION ${DESTINATION_BINDIR} COMPONENT bin
     LIBRARY DESTINATION ${DESTINATION_LIBDIR} COMPONENT lib
@@ -68,13 +68,17 @@ install(
 install(
     # the '/' at the end is important in order to not have the 'include' folder installed but only the content
     DIRECTORY ${PROJECT_SOURCE_DIR}/include/
+              ${PROJECT_SOURCE_DIR}/variation/${IOX2_VARIATION_EXPECTED_INCLUDE}/
+              ${PROJECT_SOURCE_DIR}/variation/${IOX2_VARIATION_OPTIONAL_INCLUDE}/
     DESTINATION ${DESTINATION_INCLUDEDIR}
     COMPONENT dev
 )
 
 # license
 install(
-    FILES ${PROJECT_SOURCE_DIR}/LICENSE-APACHE  ${PROJECT_SOURCE_DIR}/LICENSE-MIT
+    FILES ${PROJECT_SOURCE_DIR}/LICENSE-APACHE
+        ${PROJECT_SOURCE_DIR}/LICENSE-MIT
+        ${PROJECT_SOURCE_DIR}/NOTICE.md
     DESTINATION ${DESTINATION_DATAROOTDIR}/doc/${PROJECT_NAME}
     COMPONENT dev
 )

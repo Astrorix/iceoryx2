@@ -22,6 +22,9 @@ pub const USER_NAME_LENGTH: usize = 31;
 pub const GROUP_NAME_LENGTH: usize = 31;
 pub const NAME_MAX: usize = crate::internal::NAME_MAX as _;
 
+pub const STDOUT_FILENO: u32 = crate::internal::STDOUT_FILENO as _;
+pub const STDERR_FILENO: u32 = crate::internal::STDERR_FILENO as _;
+
 pub const O_RDONLY: int = crate::internal::O_RDONLY as _;
 pub const O_WRONLY: int = crate::internal::O_WRONLY as _;
 pub const O_RDWR: int = crate::internal::O_RDWR as _;
@@ -58,6 +61,8 @@ pub const MAP_FAILED: *mut void = u64::MAX as *mut void;
 pub const PTHREAD_BARRIER_SERIAL_THREAD: int = crate::internal::PTHREAD_BARRIER_SERIAL_THREAD as _;
 pub const PTHREAD_EXPLICIT_SCHED: int = crate::internal::PTHREAD_EXPLICIT_SCHED as _;
 pub const PTHREAD_INHERIT_SCHED: int = crate::internal::PTHREAD_INHERIT_SCHED as _;
+
+pub const SIGEV_SIGNAL: int = crate::internal::SIGEV_SIGNAL as _;
 
 pub const MAX_SIGNAL_VALUE: usize = 34;
 
@@ -163,8 +168,8 @@ pub const SIGVTALRM: int = crate::internal::SIGVTALRM as _;
 pub const SIGXCPU: int = crate::internal::SIGXCPU as _;
 pub const SIGXFSZ: int = crate::internal::SIGXFSZ as _;
 pub const SIG_ERR: sighandler_t = sighandler_t::MAX;
-pub const SIG_DFL: int = 0;
-pub const SIG_IGN: int = 1;
+pub const SIG_DFL: sighandler_t = 0;
+pub const SIG_IGN: sighandler_t = 1;
 pub const SA_RESTART: int = crate::internal::SA_RESTART as _;
 
 pub const AF_LOCAL: sa_family_t = crate::internal::AF_UNIX as _;

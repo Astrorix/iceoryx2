@@ -17,8 +17,8 @@ pub use iceoryx2_bb_linux::epoll::{
 use alloc::format;
 
 use iceoryx2_bb_linux::epoll::{EpollAttachmentError, EpollWaitError};
-use iceoryx2_bb_log::{fail, warn};
 use iceoryx2_bb_posix::file_descriptor::FileDescriptor;
+use iceoryx2_log::{fail, warn};
 
 use crate::reactor::{
     Reactor, ReactorAttachError, ReactorBuilder, ReactorCreateError, ReactorGuard, ReactorWaitError,
@@ -88,7 +88,7 @@ impl Reactor for Epoll {
     fn attach<
         'reactor,
         'attachment,
-        F: iceoryx2_bb_posix::file_descriptor_set::SynchronousMultiplexing + core::fmt::Debug,
+        F: iceoryx2_bb_posix::file_descriptor_set::SynchronousMultiplexing + core::fmt::Debug + ?Sized,
     >(
         &'reactor self,
         value: &'attachment F,

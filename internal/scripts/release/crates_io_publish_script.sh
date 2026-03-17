@@ -21,20 +21,25 @@ C_YELLOW='\033[1;33m'
 C_BLUE='\033[1;34m'
 
 DO_DRY_RUN=false
+ALLOW_DIRTY_FLAG=""
 DO_LIST_CRATES_TO_PUBLISH=false
 DO_PUBLISH=false
 DO_SANITY_CHECKS=false
 
 CRATES_TO_PUBLISH=(
     iceoryx2-pal-configuration
-    iceoryx2-pal-testing
     iceoryx2-pal-concurrency-sync
     iceoryx2-pal-posix
+    iceoryx2-pal-print
+    iceoryx2-pal-testing
     iceoryx2-pal-os-api
-    iceoryx2-bb-conformance-test-macros
+    iceoryx2-log-types
+    iceoryx2-log
+    iceoryx2-bb-print
     iceoryx2-bb-elementary-traits
-    iceoryx2-bb-testing
-    iceoryx2-bb-log
+    iceoryx2-bb-concurrency
+    iceoryx2-bb-loggers
+    iceoryx2-bb-conformance-test-macros
     iceoryx2-bb-elementary
     iceoryx2-bb-derive-macros
     iceoryx2-bb-container
@@ -42,11 +47,11 @@ CRATES_TO_PUBLISH=(
     iceoryx2-bb-posix
     iceoryx2-bb-linux
     iceoryx2-bb-lock-free
+    iceoryx2-bb-testing
     iceoryx2-bb-threadsafe
     iceoryx2-bb-memory
     iceoryx2-cal
     iceoryx2-cal-conformance-tests
-    iceoryx2-bb-trait-tests
     iceoryx2
     iceoryx2-conformance-tests
     iceoryx2-services-discovery
@@ -62,11 +67,31 @@ CRATES_TO_IGNORE=(
     benchmark-publish-subscribe
     benchmark-request-response
     benchmark-queue
+    component-tests_rust
     example
     iceoryx2-ffi-c
     iceoryx2-ffi-macros
     iceoryx2-ffi-python
     iceoryx2-tunnel-end-to-end-tests
+    iceoryx2-bb-testing-nostd
+    iceoryx2-bb-testing-nostd-macros
+    iceoryx2-bb-trait-tests
+    iceoryx2-bb-elementary-tests-common
+    iceoryx2-bb-elementary-tests-nostd
+    iceoryx2-bb-threadsafe-tests-common
+    iceoryx2-bb-threadsafe-tests-nostd
+    iceoryx2-bb-concurrency-tests-common
+    iceoryx2-bb-concurrency-tests-nostd
+    iceoryx2-bb-lock-free-tests-common
+    iceoryx2-bb-lock-free-tests-nostd
+    iceoryx2-bb-memory-tests-common
+    iceoryx2-bb-memory-tests-nostd
+    iceoryx2-bb-container-tests-common
+    iceoryx2-bb-container-tests-nostd
+    iceoryx2-bb-derive-macros-tests-common
+    iceoryx2-bb-derive-macros-tests-nostd
+    iceoryx2-bb-trait-tests-common
+    iceoryx2-bb-trait-tests-nostd
 )
 
 if [[ "$#" -eq 0 ]]; then
@@ -78,6 +103,11 @@ while (( "$#" )); do
     case "$1" in
         "dry-run")
             DO_DRY_RUN=true
+            shift 1
+            ;;
+        "dry-run-allow-dirty")
+            DO_DRY_RUN=true
+            ALLOW_DIRTY_FLAG="--allow-dirty"
             shift 1
             ;;
         "list-crates-to-publish")
@@ -99,6 +129,7 @@ while (( "$#" )); do
             echo -e "Options:"
             echo -e "    dry-run                 Simulate publishing to crates.io"
             echo -e "                            Only works with Rust >= 1.90"
+            echo -e "    dry-run-allow-dirty     Same as 'dry-run' but with a dirty workspace"
             echo -e "    publish                 Publish to crates.io"
             echo -e "    list-crates-to-publish  List crates to publish to crates.io"
             echo -e "    sanity-checks           Sanity checks for cyclic dependencies and new crates"
@@ -143,7 +174,7 @@ sanity_check_cyclic_dependencies() {
     for CRATE in "${CRATES_TO_PUBLISH[@]}"; do
         ALLOWED_CRATE_DEPENDENCIES+=("${CRATE}")
 
-        local CRATE_DEPENDENCIES=$(cargo tree --package "${CRATE}" --depth 1 --prefix none | grep -v '(\*)' | grep -e '^iceoryx2' | awk '{print $1}' | sort | uniq)
+        local CRATE_DEPENDENCIES=$(cargo tree --package "${CRATE}" --depth 1 --prefix none --edges normal | grep -v '(\*)' | grep -e '^iceoryx2' | awk '{print $1}' | sort | uniq)
         for DEP in ${CRATE_DEPENDENCIES}; do
             if [[ " ${ALLOWED_CRATE_DEPENDENCIES[@]} " =~ " ${DEP} " ]]; then
                 continue
@@ -169,7 +200,7 @@ dry_run() {
     for CRATE in "${CRATES_TO_IGNORE[@]}"; do
         EXCLUDE_ARGS+="--exclude $CRATE "
     done
-    cargo publish --dry-run --workspace ${EXCLUDE_ARGS}
+    cargo publish --dry-run --workspace ${EXCLUDE_ARGS} ${ALLOW_DIRTY_FLAG}
 }
 
 list_crates_to_publish() {
@@ -179,13 +210,11 @@ list_crates_to_publish() {
 }
 
 publish() {
-    # NOTE: while 'cargo publish --workspace' is now stable, we still publish
-    #       the crates separately from a known list pro prevent accidentally
-    #       publishing a crate not intended to be published
-    for CRATE in ${CRATES_TO_PUBLISH[@]}; do
-        echo -e "${C_BLUE}${CRATE}${C_OFF}"
-        cargo publish -p ${CRATE}
+    local EXCLUDE_ARGS=""
+    for CRATE in "${CRATES_TO_IGNORE[@]}"; do
+        EXCLUDE_ARGS+="--exclude $CRATE "
     done
+    cargo publish --workspace ${EXCLUDE_ARGS}
 }
 
 if [[ ${DO_SANITY_CHECKS} == true ]]; then

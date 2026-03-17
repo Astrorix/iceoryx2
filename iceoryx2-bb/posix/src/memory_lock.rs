@@ -14,28 +14,27 @@
 //! This may increase the runtime and reduce jitter in a realtime applications since the specific
 //! region inside the memory is not moved into the swap space.
 
-use crate::handle_errno;
 use crate::system_configuration::SystemInfo;
 use iceoryx2_bb_elementary::enum_gen;
-use iceoryx2_bb_log::fatal_panic;
+use iceoryx2_log::fatal_panic;
 use iceoryx2_pal_posix::posix::errno::Errno;
 use iceoryx2_pal_posix::*;
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum MemoryLockCreationError {
+enum_gen! { MemoryLockCreationError
+  entry:
     InvalidAddressRange,
     UnableToLock,
     AddressNotAMultipleOfThePageSize,
     InsufficientPermissions,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum MemoryLockAllError {
+enum_gen! { MemoryLockAllError
+  entry:
     UnableToLock,
     WouldExceedMainMemory,
     InsufficientPermissions,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
 enum_gen! {

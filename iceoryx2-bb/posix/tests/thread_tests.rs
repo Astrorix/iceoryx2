@@ -10,6 +10,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+extern crate iceoryx2_bb_loggers;
+
+use iceoryx2_bb_concurrency::atomic::{AtomicU64, Ordering};
+use iceoryx2_bb_posix::barrier::{BarrierBuilder, BarrierHandle};
+use iceoryx2_bb_posix::mutex::Handle;
 use iceoryx2_bb_posix::system_configuration::SystemInfo;
 use iceoryx2_bb_posix::thread::*;
 use iceoryx2_bb_testing::watchdog::Watchdog;
@@ -42,7 +47,7 @@ fn thread_set_name_works() {
     };
 
     barrier.wait();
-    let name = thread.get_name().unwrap().clone();
+    let name = *thread.get_name().unwrap();
     barrier.wait();
     drop(thread);
 
@@ -288,16 +293,25 @@ fn thread_set_affinity_to_one_core_from_thread_works() {
     let barrier = Arc::new(Barrier::new(2));
     let mut thread = {
         let barrier = barrier.clone();
-        ThreadBuilder::new()
-            .spawn(move || {
-                barrier.wait();
-                let handle = ThreadHandle::from_self();
-                let affinity = handle.get_affinity().unwrap();
-                barrier.wait();
-                assert_that!(affinity, len 1);
-                assert_that!(affinity[0], eq 0);
-            })
-            .unwrap()
+        let spawn_result = ThreadBuilder::new().spawn(move || {
+            barrier.wait();
+            let handle = ThreadHandle::from_self();
+            let mut affinity = Vec::new();
+            match handle.get_affinity() {
+                Ok(value) => affinity = value,
+                Err(error) => println!("Expected value but got error: {error:?}"),
+            }
+            barrier.wait();
+            assert_that!(affinity, len 1);
+            assert_that!(affinity[0], eq 0);
+        });
+
+        if let Err(error) = spawn_result {
+            println!("Expected value but got error: {error:?}");
+            assert!(false);
+        }
+
+        spawn_result.unwrap()
     };
 
     thread.set_affinity(&[0]).unwrap();
@@ -398,19 +412,58 @@ fn thread_destructor_does_block_on_busy_thread() {
     let barrier = Arc::new(Barrier::new(2));
     let thread = {
         let barrier = barrier.clone();
-        ThreadBuilder::new()
-            .spawn(move || {
-                barrier.wait();
-                let start = Instant::now();
-                while start.elapsed() < SLEEP_DURATION {
-                    std::thread::sleep(SLEEP_DURATION - start.elapsed());
-                }
-            })
-            .unwrap()
+        let spawn_result = ThreadBuilder::new().spawn(move || {
+            barrier.wait();
+            let start = Instant::now();
+            while start.elapsed() < SLEEP_DURATION {
+                std::thread::sleep(SLEEP_DURATION - start.elapsed());
+            }
+        });
+
+        if let Err(error) = spawn_result {
+            println!("Expected value but got error: {error:?}");
+            assert!(false);
+        }
+
+        spawn_result.unwrap()
     };
 
     barrier.wait();
     let start = Instant::now();
     drop(thread);
     assert_that!(start.elapsed(), time_at_least SLEEP_DURATION);
+}
+
+#[test]
+fn scoped_threads_work() {
+    let _watchdog = Watchdog::new();
+    let number_of_threads = MAX_SCOPED_THREADS;
+    let handle = BarrierHandle::new();
+    let barrier = BarrierBuilder::new((number_of_threads + 1) as _)
+        .create(&handle)
+        .unwrap();
+    let shared_counter = AtomicU64::new(0);
+
+    thread_scope(|s| {
+        for _ in 0..number_of_threads {
+            s.thread_builder()
+                .spawn(|| {
+                    barrier.wait();
+                    for _ in 0..1000 {
+                        shared_counter.fetch_add(1, Ordering::Relaxed);
+                    }
+                })
+                .unwrap();
+        }
+
+        barrier.wait();
+
+        Ok(())
+    })
+    .unwrap();
+
+    assert_that!(
+        shared_counter.load(Ordering::Relaxed),
+        eq(number_of_threads * 1000) as u64
+    );
 }

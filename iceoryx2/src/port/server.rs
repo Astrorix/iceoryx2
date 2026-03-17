@@ -74,21 +74,22 @@
 //! ```
 
 use alloc::sync::Arc;
-use core::{cell::UnsafeCell, sync::atomic::Ordering};
 use core::{fmt::Debug, marker::PhantomData};
+
+use iceoryx2_bb_concurrency::atomic::AtomicUsize;
+use iceoryx2_bb_concurrency::atomic::Ordering;
+use iceoryx2_bb_concurrency::cell::UnsafeCell;
 use iceoryx2_bb_container::slotmap::SlotMap;
 use iceoryx2_bb_container::vector::polymorphic_vec::*;
-use iceoryx2_bb_elementary_traits::zero_copy_send::ZeroCopySend;
-use iceoryx2_bb_memory::heap_allocator::HeapAllocator;
-use iceoryx2_cal::zero_copy_connection::ChannelId;
-use iceoryx2_pal_concurrency_sync::iox_atomic::IoxAtomicUsize;
-
 use iceoryx2_bb_elementary::{cyclic_tagger::CyclicTagger, CallbackProgression};
+use iceoryx2_bb_elementary_traits::zero_copy_send::ZeroCopySend;
 use iceoryx2_bb_lock_free::mpmc::container::{ContainerHandle, ContainerState};
-use iceoryx2_bb_log::{fail, warn};
+use iceoryx2_bb_memory::heap_allocator::HeapAllocator;
 use iceoryx2_bb_posix::unique_system_id::UniqueSystemId;
 use iceoryx2_cal::arc_sync_policy::ArcSyncPolicy;
 use iceoryx2_cal::dynamic_storage::DynamicStorage;
+use iceoryx2_cal::zero_copy_connection::ChannelId;
+use iceoryx2_log::{fail, warn};
 
 use crate::port::update_connections::UpdateConnections;
 use crate::prelude::UnableToDeliverStrategy;
@@ -301,7 +302,6 @@ impl<
             unsafe { service.static_config.messaging_pattern.request_response() }
                 .required_amount_of_chunks_per_server_data_segment(
                     server_factory.max_loaned_responses_per_request,
-                    number_of_requests_per_client,
                 );
 
         let client_list = &service.dynamic_storage.get().request_response().clients;
@@ -325,7 +325,7 @@ impl<
             .expect("Heap allocator provides memory."),
             receiver_port_id: server_id.value(),
             service_state: service.clone(),
-            message_type_details: static_config.request_message_type_details.clone(),
+            message_type_details: static_config.request_message_type_details,
             receiver_max_borrowed_samples: static_config.max_active_requests_per_client,
             enable_safe_overflow: static_config.enable_safe_overflow_for_requests,
             buffer_size: static_config.max_active_requests_per_client,
@@ -396,7 +396,7 @@ impl<
             receiver_max_borrowed_samples: static_config
                 .max_borrowed_responses_per_pending_response,
             sender_max_borrowed_samples: server_factory.max_loaned_responses_per_request
-                * number_of_requests_per_client
+                * static_config.max_active_requests_per_client
                 * static_config.max_clients,
             enable_safe_overflow: static_config.enable_safe_overflow_for_responses,
             number_of_samples: number_of_responses,
@@ -404,9 +404,9 @@ impl<
             degradation_callback: server_factory.response_degradation_callback,
             service_state: service.clone(),
             tagger: CyclicTagger::new(),
-            loan_counter: IoxAtomicUsize::new(0),
+            loan_counter: AtomicUsize::new(0),
             unable_to_deliver_strategy: server_factory.config.unable_to_deliver_strategy,
-            message_type_details: static_config.response_message_type_details.clone(),
+            message_type_details: static_config.response_message_type_details,
             number_of_channels: number_of_requests_per_client,
         };
 
@@ -540,7 +540,7 @@ impl<
 
         ActiveRequest {
             details,
-            shared_loan_counter: Arc::new(IoxAtomicUsize::new(0)),
+            shared_loan_counter: Arc::new(AtomicUsize::new(0)),
             max_loan_count: self.max_loaned_responses_per_request,
             request_id: header.request_id,
             channel_id: header.channel_id,
@@ -649,7 +649,7 @@ impl<
 
         ActiveRequest {
             details,
-            shared_loan_counter: Arc::new(IoxAtomicUsize::new(0)),
+            shared_loan_counter: Arc::new(AtomicUsize::new(0)),
             max_loan_count: self.max_loaned_responses_per_request,
             request_id: header.request_id,
             channel_id: header.channel_id,

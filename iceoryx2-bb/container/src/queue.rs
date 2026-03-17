@@ -10,7 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Three queue variations that are similar to [`std::collections::VecDeque`].
+//! Three queue variations that are similar to [`alloc::collections::vec_deque::VecDeque`].
 //!
 //!  * [`FixedSizeQueue`](crate::queue::FixedSizeQueue), compile-time fixed size queue that
 //!     is self-contained.
@@ -24,6 +24,8 @@
 //! ## Use the [`FixedSizeQueue`](crate::queue::FixedSizeQueue)
 //!
 //! ```
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_container::queue::FixedSizeQueue;
 //!
 //! const QUEUE_CAPACITY: usize = 1;
@@ -40,6 +42,8 @@
 //! ## Use the [`Queue`](crate::queue::Queue)
 //!
 //! ```
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_container::queue::Queue;
 //!
 //! let queue_capacity = 1234;
@@ -55,6 +59,8 @@
 //! ## Create [`RelocatableQueue`](crate::queue::RelocatableQueue) inside constructs which provides memory
 //!
 //! ```
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_container::queue::RelocatableQueue;
 //! use iceoryx2_bb_elementary::math::align_to;
 //! use iceoryx2_bb_elementary::bump_allocator::BumpAllocator;
@@ -71,7 +77,7 @@
 //!     pub fn new() -> Self {
 //!         let mut new_self = Self {
 //!             queue: unsafe { RelocatableQueue::new_uninit(QUEUE_CAPACITY) },
-//!             queue_memory: core::array::from_fn(|_| MaybeUninit::uninit()),
+//!             queue_memory: [const { MaybeUninit::uninit() }; QUEUE_CAPACITY] ,
 //!         };
 //!
 //!         let allocator = BumpAllocator::new(new_self.queue_memory.as_mut_ptr().cast());
@@ -86,6 +92,8 @@
 //! ## Create [`RelocatableQueue`](crate::queue::RelocatableQueue) with allocator
 //!
 //! ```
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_container::queue::RelocatableQueue;
 //! use iceoryx2_bb_elementary::bump_allocator::BumpAllocator;
 //! use iceoryx2_bb_elementary_traits::relocatable_container::RelocatableContainer;
@@ -103,6 +111,7 @@
 //!
 use core::marker::PhantomData;
 use core::{alloc::Layout, fmt::Debug, mem::MaybeUninit};
+use iceoryx2_bb_concurrency::atomic::AtomicBool;
 use iceoryx2_bb_elementary::bump_allocator::BumpAllocator;
 use iceoryx2_bb_elementary::math::unaligned_mem_size;
 use iceoryx2_bb_elementary::relocatable_ptr::{GenericRelocatablePointer, RelocatablePointer};
@@ -113,8 +122,7 @@ use iceoryx2_bb_elementary_traits::placement_default::PlacementDefault;
 use iceoryx2_bb_elementary_traits::pointer_trait::PointerTrait;
 pub use iceoryx2_bb_elementary_traits::relocatable_container::RelocatableContainer;
 use iceoryx2_bb_elementary_traits::zero_copy_send::ZeroCopySend;
-use iceoryx2_bb_log::{fail, fatal_panic};
-use iceoryx2_pal_concurrency_sync::iox_atomic::IoxAtomicBool;
+use iceoryx2_log::{fail, fatal_panic};
 
 /// Queue with run-time fixed size capacity. In contrast to its counterpart the
 /// [`RelocatableQueue`] it is movable but is not shared memory compatible.
@@ -131,7 +139,7 @@ pub struct MetaQueue<T, Ptr: GenericPointer> {
     start: usize,
     len: usize,
     capacity: usize,
-    is_initialized: IoxAtomicBool,
+    is_initialized: AtomicBool,
     _phantom_data: PhantomData<T>,
 }
 
@@ -145,7 +153,7 @@ impl<T> Queue<T> {
             start: 0,
             len: 0,
             capacity,
-            is_initialized: IoxAtomicBool::new(true),
+            is_initialized: AtomicBool::new(true),
             _phantom_data: PhantomData,
         }
     }
@@ -219,7 +227,7 @@ impl<T> RelocatableContainer for RelocatableQueue<T> {
             start: 0,
             len: 0,
             capacity,
-            is_initialized: IoxAtomicBool::new(false),
+            is_initialized: AtomicBool::new(false),
             _phantom_data: PhantomData,
         }
     }

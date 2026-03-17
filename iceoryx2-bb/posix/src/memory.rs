@@ -14,11 +14,11 @@
 
 pub use core::alloc::Layout;
 pub use core::ptr::NonNull;
-use iceoryx2_bb_elementary::math::*;
+
+use iceoryx2_bb_elementary::{enum_gen, math::*};
 use iceoryx2_bb_elementary_traits::allocator::{
     AllocationError, AllocationGrowError, AllocationShrinkError,
 };
-
 use iceoryx2_pal_posix::posix::errno::Errno;
 use iceoryx2_pal_posix::*;
 
@@ -54,18 +54,17 @@ impl From<MemoryError> for AllocationShrinkError {
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum MemoryError {
+enum_gen! { MemoryError
+  entry:
     OutOfMemory,
     SizeIsZero,
     AlignmentFailure,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
 /// Performs heap allocations. Basis for a heap allocator.
 pub mod heap {
-    use crate::handle_errno;
-    use iceoryx2_bb_log::fail;
+    use iceoryx2_log::fail;
 
     use super::*;
 

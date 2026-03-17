@@ -74,20 +74,18 @@ echo
 export PATH=$PATH:$HOME/.cargo/bin
 rustup default $RUST_TOOLCHAIN
 # export RUSTFLAGS="-C debug-assertions"
-cargo fmt --all -- --check
-cargo clippy --workspace --exclude iceoryx2-tunnels-zenoh -- -D warnings
 
 echo "###################"
 echo "# Run cargo build #"
 echo "###################"
 
-cargo build --workspace --exclude iceoryx2-tunnels-zenoh --all-targets $RUST_BUILD_TYPE_FLAG
+cargo build --workspace --exclude iceoryx2-tunnel-zenoh --all-targets $RUST_BUILD_TYPE_FLAG
 
 echo "######################"
 echo "# Run cargo nextest #"
 echo "#####################"
 
-cargo nextest run --workspace --exclude iceoryx2-tunnels-zenoh --all-targets --no-fail-fast $RUST_BUILD_TYPE_FLAG
+cargo nextest run --workspace --exclude iceoryx2-tunnel-zenoh --all-targets --no-fail-fast $RUST_BUILD_TYPE_FLAG
 
 echo "###########################################################"
 echo "# Clean the target directory to reduce memory usage on VM #"
@@ -102,11 +100,8 @@ echo "###########################"
 echo "# Build language bindings #"
 echo "###########################"
 
-./internal/scripts/ci_build_and_install_iceoryx_hoofs.sh
-rm -rf target/ff/iceoryx/build
-
 # Build examples only in out-of-tree, else we are running out of disk space on the VM
-cmake -S . -B target/ff/cc/build $CMAKE_BUILD_TYPE_FLAG -DBUILD_EXAMPLES=OFF -DBUILD_TESTING=ON -DCMAKE_INSTALL_PREFIX=target/ff/cc/install -DCMAKE_PREFIX_PATH="$( pwd )/target/ff/iceoryx/install"
+cmake -S . -B target/ff/cc/build $CMAKE_BUILD_TYPE_FLAG -DBUILD_EXAMPLES=OFF -DBUILD_TESTING=ON -DCMAKE_INSTALL_PREFIX=target/ff/cc/install
 cmake --build target/ff/cc/build
 cmake --install target/ff/cc/build
 
@@ -126,6 +121,6 @@ cmake -S examples/c -B target/ff/out-of-tree-c $CMAKE_BUILD_TYPE_FLAG -DCMAKE_PR
 cmake --build target/ff/out-of-tree-c
 rm -rf target/ff/out-of-tree-c
 
-cmake -S examples/cxx -B target/ff/out-of-tree-cxx $CMAKE_BUILD_TYPE_FLAG -DCMAKE_PREFIX_PATH="$( pwd )/target/ff/cc/install;$( pwd )/target/ff/iceoryx/install"
+cmake -S examples/cxx -B target/ff/out-of-tree-cxx $CMAKE_BUILD_TYPE_FLAG -DCMAKE_PREFIX_PATH="$( pwd )/target/ff/cc/install"
 cmake --build target/ff/out-of-tree-cxx
 rm -rf target/ff/out-of-tree-cxx

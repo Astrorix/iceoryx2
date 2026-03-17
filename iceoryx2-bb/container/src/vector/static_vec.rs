@@ -18,6 +18,8 @@
 //! # Example
 //!
 //! ```
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_container::vector::*;
 //!
 //! const CAPACITY: usize = 123;
@@ -36,7 +38,7 @@ use core::{
 use iceoryx2_bb_elementary_traits::{
     placement_default::PlacementDefault, zero_copy_send::ZeroCopySend,
 };
-use iceoryx2_bb_log::fail;
+use iceoryx2_log::fail;
 use serde::{de::Visitor, Deserialize, Serialize};
 
 pub use crate::vector::Vector;
@@ -47,7 +49,7 @@ use crate::vector::{internal, VectorModificationError};
 /// iceoryx2-bb-container C++ library and can be used for zero-copy
 /// cross-language communication.
 ///
-/// In contrast to the Rust [`Vec`] it has a defined reverse drop order.
+/// In contrast to the Rust [`alloc::vec::Vec`] it has a defined reverse drop order.
 #[repr(C)]
 pub struct StaticVec<T, const CAPACITY: usize> {
     data: [MaybeUninit<T>; CAPACITY],

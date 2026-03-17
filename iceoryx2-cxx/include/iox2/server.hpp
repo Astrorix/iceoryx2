@@ -13,9 +13,10 @@
 #ifndef IOX2_SERVER_HPP
 #define IOX2_SERVER_HPP
 
-#include "iox/expected.hpp"
-#include "iox/slice.hpp"
 #include "iox2/active_request.hpp"
+#include "iox2/bb/expected.hpp"
+#include "iox2/bb/optional.hpp"
+#include "iox2/bb/slice.hpp"
 #include "iox2/service_type.hpp"
 #include "iox2/unique_port_id.hpp"
 
@@ -39,19 +40,19 @@ class Server {
     /// Receives a [`RequestMut`] that was sent by a [`Client`] and returns an
     /// [`ActiveRequest`] which can be used to respond.
     /// If no [`RequestMut`]s were received it returns [`None`].
-    auto receive() -> iox::expected<
-        iox::optional<ActiveRequest<Service, RequestPayload, RequestHeader, ResponsePayload, ResponseHeader>>,
+    auto receive() -> bb::Expected<
+        bb::Optional<ActiveRequest<Service, RequestPayload, RequestHeader, ResponsePayload, ResponseHeader>>,
         ReceiveError>;
 
     /// Returns the maximum initial slice length configured for this [`Server`].
-    template <typename T = ResponsePayload, typename = std::enable_if_t<iox::IsSlice<T>::VALUE, void>>
+    template <typename T = ResponsePayload, typename = std::enable_if_t<bb::IsSlice<T>::VALUE, void>>
     auto initial_max_slice_len() const -> uint64_t;
 
     /// Returns the [`UniqueServerId`] of the [`Server`]
     auto id() const -> UniqueServerId;
 
     /// Returns true if the [`Server`] has [`RequestMut`]s in its buffer.
-    auto has_requests() const -> iox::expected<bool, ConnectionFailure>;
+    auto has_requests() const -> bb::Expected<bool, ConnectionFailure>;
 
   private:
     template <ServiceType, typename, typename, typename, typename>
@@ -104,8 +105,8 @@ template <ServiceType Service,
           typename RequestHeader,
           typename ResponsePayload,
           typename ResponseHeader>
-inline auto Server<Service, RequestPayload, RequestHeader, ResponsePayload, ResponseHeader>::receive() -> iox::expected<
-    iox::optional<ActiveRequest<Service, RequestPayload, RequestHeader, ResponsePayload, ResponseHeader>>,
+inline auto Server<Service, RequestPayload, RequestHeader, ResponsePayload, ResponseHeader>::receive() -> bb::Expected<
+    bb::Optional<ActiveRequest<Service, RequestPayload, RequestHeader, ResponsePayload, ResponseHeader>>,
     ReceiveError> {
     iox2_active_request_h active_request_handle {};
     auto result = iox2_server_receive(&m_handle, nullptr, &active_request_handle);
@@ -114,15 +115,13 @@ inline auto Server<Service, RequestPayload, RequestHeader, ResponsePayload, Resp
         if (active_request_handle != nullptr) {
             ActiveRequest<Service, RequestPayload, RequestHeader, ResponsePayload, ResponseHeader> active_request(
                 active_request_handle);
-            return iox::ok(
-                iox::optional<ActiveRequest<Service, RequestPayload, RequestHeader, ResponsePayload, ResponseHeader>>(
-                    std::move(active_request)));
+            return bb::Optional<ActiveRequest<Service, RequestPayload, RequestHeader, ResponsePayload, ResponseHeader>>(
+                std::move(active_request));
         }
-        return iox::ok(
-            iox::optional<ActiveRequest<Service, RequestPayload, RequestHeader, ResponsePayload, ResponseHeader>>(
-                iox::nullopt));
+        return bb::Optional<ActiveRequest<Service, RequestPayload, RequestHeader, ResponsePayload, ResponseHeader>>(
+            bb::NULLOPT);
     }
-    return iox::err(iox::into<ReceiveError>(result));
+    return bb::err(bb::into<ReceiveError>(result));
 }
 
 template <ServiceType Service,
@@ -155,15 +154,15 @@ template <ServiceType Service,
           typename ResponsePayload,
           typename ResponseHeader>
 inline auto Server<Service, RequestPayload, RequestHeader, ResponsePayload, ResponseHeader>::has_requests() const
-    -> iox::expected<bool, ConnectionFailure> {
+    -> bb::Expected<bool, ConnectionFailure> {
     bool has_requests_result = false;
     auto result = iox2_server_has_requests(&m_handle, &has_requests_result);
 
     if (result == IOX2_OK) {
-        return iox::ok(has_requests_result);
+        return has_requests_result;
     }
 
-    return iox::err(iox::into<ConnectionFailure>(result));
+    return bb::err(bb::into<ConnectionFailure>(result));
 }
 
 template <ServiceType Service,

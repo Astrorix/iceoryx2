@@ -18,6 +18,8 @@
 //! ## Transfer data
 //!
 //! ```
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_posix::unix_datagram_socket::*;
 //! use iceoryx2_bb_posix::permission::*;
 //! use iceoryx2_bb_system_types::file_path::FilePath;
@@ -45,6 +47,8 @@
 //! ## Transfer [`SocketCred`]s
 //!
 //! ```ignore
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_posix::unix_datagram_socket::*;
 //! use iceoryx2_bb_posix::socket_ancillary::*;
 //! use iceoryx2_bb_system_types::file_path::FilePath;
@@ -76,6 +80,8 @@
 //! ## Transfer [`FileDescriptor`]s
 //!
 //! ```no_run
+//! # extern crate iceoryx2_bb_loggers;
+//!
 //! use iceoryx2_bb_posix::unix_datagram_socket::*;
 //! use iceoryx2_bb_posix::socket_ancillary::*;
 //! use iceoryx2_bb_posix::file::*;
@@ -118,17 +124,17 @@
 //! ```
 
 use core::mem::MaybeUninit;
-use core::sync::atomic::Ordering;
 use core::{mem::size_of, time::Duration};
 
 use alloc::format;
 
+use iceoryx2_bb_concurrency::atomic::AtomicBool;
+use iceoryx2_bb_concurrency::atomic::Ordering;
 use iceoryx2_bb_container::semantic_string::*;
 use iceoryx2_bb_elementary::enum_gen;
 use iceoryx2_bb_elementary::scope_guard::ScopeGuardBuilder;
-use iceoryx2_bb_log::{fail, fatal_panic, trace};
 use iceoryx2_bb_system_types::file_path::FilePath;
-use iceoryx2_pal_concurrency_sync::iox_atomic::IoxAtomicBool;
+use iceoryx2_log::{fail, fatal_panic, trace};
 use iceoryx2_pal_posix::posix::{errno::Errno, MemZeroedStruct};
 
 use crate::clock::AsTimeval;
@@ -140,8 +146,8 @@ use crate::{config::UNIX_DOMAIN_SOCKET_PATH_LENGTH, file::*, permission::Permiss
 pub use crate::creation_mode::CreationMode;
 use iceoryx2_pal_posix::*;
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum UnixDatagramCreationError {
+enum_gen! { UnixDatagramCreationError
+  entry:
     SocketNameTooLong,
     InsufficientPermissions,
     InsufficientResources,
@@ -150,7 +156,7 @@ pub enum UnixDatagramCreationError {
     SystemWideFileHandleLimitReached,
     DatagramProtocolNotSupported,
     UnixDomainSocketsNotSupported,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
 enum_gen! {
@@ -257,26 +263,26 @@ enum_gen! {
     UnixDatagramSetSocketOptionError
 }
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum UnixDatagramSetSocketOptionError {
+enum_gen! { UnixDatagramSetSocketOptionError
+  entry:
     InsufficientMemory,
     InsufficientResources,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum UnixDatagramGetSocketOptionError {
+enum_gen! { UnixDatagramGetSocketOptionError
+  entry:
     InsufficientPermissions,
     InsufficientResources,
     SocketHasBeenShutDown,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum UnixDatagramSetPropertyError {
+enum_gen! { UnixDatagramSetPropertyError
+  entry:
     Interrupt,
     WouldCauseOverflow,
-    UnknownError(i32),
+    UnknownError(i32)
 }
 
 enum_gen! {
@@ -297,7 +303,7 @@ const BLOCKING_TIMEOUT: Duration = Duration::from_secs(i16::MAX as _);
 #[derive(Debug)]
 struct UnixDatagramSocket {
     name: FilePath,
-    is_non_blocking: IoxAtomicBool,
+    is_non_blocking: AtomicBool,
     file_descriptor: FileDescriptor,
 }
 
@@ -505,7 +511,7 @@ impl UnixDatagramSocket {
 
         Ok(Self {
             name: *name,
-            is_non_blocking: IoxAtomicBool::new(false),
+            is_non_blocking: AtomicBool::new(false),
             file_descriptor: FileDescriptor::new(raw_fd).unwrap(),
         })
     }
@@ -806,7 +812,7 @@ pub struct UnixDatagramReceiver {
 impl Drop for UnixDatagramReceiver {
     fn drop(&mut self) {
         fatal_panic!(from self, when File::remove(&self.socket.name), "Failed to remove socket file.");
-        trace!(from self, "stop listening and remove");
+        trace!(from self, "removed and stop listening");
     }
 }
 
@@ -832,7 +838,7 @@ impl UnixDatagramReceiver {
                 "{} since the credential support could not be activated.", msg);
         }
 
-        trace!(from new_socket, "create and listening");
+        trace!(from new_socket, "created and listening");
         Ok(new_socket)
     }
 

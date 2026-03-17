@@ -81,14 +81,25 @@ Config::Config(iox2_config_h handle)
     : m_handle { handle } {
 }
 
-auto Config::from_file(const iox::FilePath& file) -> iox::expected<Config, ConfigCreationError> {
+auto Config::from_file(const iox2::bb::FilePath& file) -> iox2::bb::Expected<Config, ConfigCreationError> {
     iox2_config_h handle = nullptr;
-    auto result = iox2_config_from_file(nullptr, &handle, file.as_string().c_str());
+    auto result = iox2_config_from_file(nullptr, &handle, file.as_string().unchecked_access().c_str());
     if (result == IOX2_OK) {
-        return iox::ok(Config(handle));
+        return Config(handle);
     }
 
-    return iox::err(iox::into<ConfigCreationError>(result));
+    return iox2::bb::err(iox2::bb::into<ConfigCreationError>(result));
+}
+
+auto Config::setup_global_config_from_file(const iox2::bb::FilePath& file)
+    -> iox2::bb::Expected<ConfigView, ConfigCreationError> {
+    iox2_config_ptr handle = nullptr;
+    auto result = iox2_config_setup_global_config_from_file(&handle, file.as_string().unchecked_access().c_str());
+    if (result == IOX2_OK) {
+        return ConfigView { handle };
+    }
+
+    return iox2::bb::err(iox2::bb::into<ConfigCreationError>(result));
 }
 
 auto Config::global() -> config::Global {
@@ -122,16 +133,16 @@ auto Global::prefix() && -> const char* {
     return iox2_config_global_prefix(m_config);
 }
 
-void Global::set_prefix(const iox::FileName& value) && {
-    iox2_config_global_set_prefix(m_config, value.as_string().c_str());
+void Global::set_prefix(const iox2::bb::FileName& value) && {
+    iox2_config_global_set_prefix(m_config, value.as_string().unchecked_access().c_str());
 }
 
 auto Global::root_path() && -> const char* {
     return iox2_config_global_root_path(m_config);
 }
 
-void Global::set_root_path(const iox::Path& value) && {
-    iox2_config_global_set_root_path(m_config, value.as_string().c_str());
+void Global::set_root_path(const iox2::bb::Path& value) && {
+    iox2_config_global_set_root_path(m_config, value.as_string().unchecked_access().c_str());
 }
 
 auto Global::service() -> Service {
@@ -210,16 +221,16 @@ void Event::set_event_id_max_value(size_t value) && {
     iox2_config_defaults_event_set_event_id_max_value(m_config, value);
 }
 
-auto Event::notifier_created_event() && -> iox::optional<size_t> {
+auto Event::notifier_created_event() && -> bb::Optional<size_t> {
     size_t value = 0;
     if (iox2_config_defaults_event_notifier_created_event(m_config, &value)) {
         return { value };
     }
 
-    return iox::nullopt;
+    return bb::NULLOPT;
 }
 
-void Event::set_notifier_created_event(iox::optional<size_t> value) && {
+void Event::set_notifier_created_event(bb::Optional<size_t> value) && {
     if (value.has_value()) {
         iox2_config_defaults_event_set_notifier_created_event(m_config, &*value);
     } else {
@@ -227,16 +238,16 @@ void Event::set_notifier_created_event(iox::optional<size_t> value) && {
     }
 }
 
-auto Event::notifier_dropped_event() && -> iox::optional<size_t> {
+auto Event::notifier_dropped_event() && -> bb::Optional<size_t> {
     size_t value = 0;
     if (iox2_config_defaults_event_notifier_dropped_event(m_config, &value)) {
         return { value };
     }
 
-    return iox::nullopt;
+    return bb::NULLOPT;
 }
 
-void Event::set_notifier_dropped_event(iox::optional<size_t> value) && {
+void Event::set_notifier_dropped_event(bb::Optional<size_t> value) && {
     if (value.has_value()) {
         iox2_config_defaults_event_set_notifier_dropped_event(m_config, &*value);
     } else {
@@ -244,16 +255,16 @@ void Event::set_notifier_dropped_event(iox::optional<size_t> value) && {
     }
 }
 
-auto Event::notifier_dead_event() && -> iox::optional<size_t> {
+auto Event::notifier_dead_event() && -> bb::Optional<size_t> {
     size_t value = 0;
     if (iox2_config_defaults_event_notifier_dead_event(m_config, &value)) {
         return { value };
     }
 
-    return iox::nullopt;
+    return bb::NULLOPT;
 }
 
-void Event::set_notifier_dead_event(iox::optional<size_t> value) && {
+void Event::set_notifier_dead_event(bb::Optional<size_t> value) && {
     if (value.has_value()) {
         iox2_config_defaults_event_set_notifier_dead_event(m_config, &*value);
     } else {
@@ -261,25 +272,25 @@ void Event::set_notifier_dead_event(iox::optional<size_t> value) && {
     }
 }
 
-auto Event::deadline() && -> iox::optional<iox::units::Duration> {
+auto Event::deadline() && -> bb::Optional<iox2::bb::Duration> {
     uint64_t seconds = 0;
     uint32_t nanoseconds = 0;
     if (iox2_config_defaults_event_deadline(m_config, &seconds, &nanoseconds)) {
-        return { iox::units::Duration::fromSeconds(seconds) + iox::units::Duration::fromNanoseconds(nanoseconds) };
+        return { iox2::bb::Duration::from_secs(seconds) + iox2::bb::Duration::from_nanos(nanoseconds) };
     }
 
-    return iox::nullopt;
+    return bb::NULLOPT;
 }
 
-void Event::set_deadline(iox::optional<iox::units::Duration> value) && {
-    value
-        .and_then([&](auto value) -> auto {
-            auto duration = value.timespec();
-            const auto secs = static_cast<uint64_t>(duration.tv_sec);
-            const auto nsecs = static_cast<uint32_t>(duration.tv_nsec);
-            iox2_config_defaults_event_set_deadline(m_config, &secs, &nsecs);
-        })
-        .or_else([&]() -> auto { iox2_config_defaults_event_set_deadline(m_config, nullptr, nullptr); });
+void Event::set_deadline(bb::Optional<iox2::bb::Duration> deadline) && {
+    if (deadline.has_value()) {
+        auto duration = deadline.value();
+        const auto secs = duration.as_secs();
+        const auto nsecs = duration.subsec_nanos();
+        iox2_config_defaults_event_set_deadline(m_config, &secs, &nsecs);
+    } else {
+        iox2_config_defaults_event_set_deadline(m_config, nullptr, nullptr);
+    }
 }
 /////////////////////////
 // END: Event
@@ -357,13 +368,13 @@ void PublishSubscribe::set_enable_safe_overflow(bool value) && {
 }
 
 auto PublishSubscribe::unable_to_deliver_strategy() && -> UnableToDeliverStrategy {
-    return iox::into<UnableToDeliverStrategy>(
+    return iox2::bb::into<UnableToDeliverStrategy>(
         iox2_config_defaults_publish_subscribe_unable_to_deliver_strategy(m_config));
 }
 
 void PublishSubscribe::set_unable_to_deliver_strategy(UnableToDeliverStrategy value) && {
     iox2_config_defaults_publish_subscribe_set_unable_to_deliver_strategy(
-        m_config, static_cast<iox2_unable_to_deliver_strategy_e>(iox::into<int>(value)));
+        m_config, static_cast<iox2_unable_to_deliver_strategy_e>(iox2::bb::into<int>(value)));
 }
 
 auto PublishSubscribe::subscriber_expired_connection_buffer() && -> size_t {
@@ -388,62 +399,61 @@ auto Service::directory() && -> const char* {
     return iox2_config_global_service_directory(m_config);
 }
 
-void Service::set_directory(const iox::Path& value) && {
-    iox2_config_global_service_set_directory(m_config, value.as_string().c_str());
+void Service::set_directory(const iox2::bb::Path& value) && {
+    iox2_config_global_service_set_directory(m_config, value.as_string().unchecked_access().c_str());
 }
 
 auto Service::data_segment_suffix() && -> const char* {
     return iox2_config_global_service_data_segment_suffix(m_config);
 }
 
-void Service::set_data_segment_suffix(const iox::FileName& value) && {
-    iox2_config_global_service_set_data_segment_suffix(m_config, value.as_string().c_str());
+void Service::set_data_segment_suffix(const iox2::bb::FileName& value) && {
+    iox2_config_global_service_set_data_segment_suffix(m_config, value.as_string().unchecked_access().c_str());
 }
 
 auto Service::static_config_storage_suffix() && -> const char* {
     return iox2_config_global_service_static_config_storage_suffix(m_config);
 }
 
-void Service::set_static_config_storage_suffix(const iox::FileName& value) && {
-    iox2_config_global_service_set_static_config_storage_suffix(m_config, value.as_string().c_str());
+void Service::set_static_config_storage_suffix(const iox2::bb::FileName& value) && {
+    iox2_config_global_service_set_static_config_storage_suffix(m_config, value.as_string().unchecked_access().c_str());
 }
 
 auto Service::dynamic_config_storage_suffix() && -> const char* {
     return iox2_config_global_service_dynamic_config_storage_suffix(m_config);
 }
 
-void Service::set_dynamic_config_storage_suffix(const iox::FileName& value) && {
-    iox2_config_global_service_set_dynamic_config_storage_suffix(m_config, value.as_string().c_str());
+void Service::set_dynamic_config_storage_suffix(const iox2::bb::FileName& value) && {
+    iox2_config_global_service_set_dynamic_config_storage_suffix(m_config,
+                                                                 value.as_string().unchecked_access().c_str());
 }
 
-auto Service::creation_timeout() && -> iox::units::Duration {
+auto Service::creation_timeout() && -> iox2::bb::Duration {
     uint64_t secs = 0;
     uint32_t nsecs = 0;
     iox2_config_global_service_creation_timeout(m_config, &secs, &nsecs);
 
-    return iox::units::Duration::fromSeconds(secs) + iox::units::Duration::fromNanoseconds(nsecs);
+    return iox2::bb::Duration::from_secs(secs) + iox2::bb::Duration::from_nanos(nsecs);
 }
 
-void Service::set_creation_timeout(const iox::units::Duration& value) && {
-    auto duration = value.timespec();
-    iox2_config_global_service_set_creation_timeout(
-        m_config, static_cast<uint64_t>(duration.tv_sec), static_cast<uint32_t>(duration.tv_nsec));
+void Service::set_creation_timeout(const iox2::bb::Duration& value) && {
+    iox2_config_global_service_set_creation_timeout(m_config, value.as_secs(), value.subsec_nanos());
 }
 
 auto Service::connection_suffix() && -> const char* {
     return iox2_config_global_service_connection_suffix(m_config);
 }
 
-void Service::set_connection_suffix(const iox::FileName& value) && {
-    iox2_config_global_service_set_connection_suffix(m_config, value.as_string().c_str());
+void Service::set_connection_suffix(const iox2::bb::FileName& value) && {
+    iox2_config_global_service_set_connection_suffix(m_config, value.as_string().unchecked_access().c_str());
 }
 
 auto Service::event_connection_suffix() && -> const char* {
     return iox2_config_global_service_event_connection_suffix(m_config);
 }
 
-void Service::set_event_connection_suffix(const iox::FileName& value) && {
-    iox2_config_global_service_set_event_connection_suffix(m_config, value.as_string().c_str());
+void Service::set_event_connection_suffix(const iox2::bb::FileName& value) && {
+    iox2_config_global_service_set_event_connection_suffix(m_config, value.as_string().unchecked_access().c_str());
 }
 /////////////////////////
 // END: Service
@@ -460,32 +470,32 @@ auto Node::directory() && -> const char* {
     return iox2_config_global_node_directory(m_config);
 }
 
-void Node::set_directory(const iox::Path& value) && {
-    iox2_config_global_node_set_directory(m_config, value.as_string().c_str());
+void Node::set_directory(const iox2::bb::Path& value) && {
+    iox2_config_global_node_set_directory(m_config, value.as_string().unchecked_access().c_str());
 }
 
 auto Node::monitor_suffix() && -> const char* {
     return iox2_config_global_node_monitor_suffix(m_config);
 }
 
-void Node::set_monitor_suffix(const iox::FileName& value) && {
-    iox2_config_global_node_set_monitor_suffix(m_config, value.as_string().c_str());
+void Node::set_monitor_suffix(const iox2::bb::FileName& value) && {
+    iox2_config_global_node_set_monitor_suffix(m_config, value.as_string().unchecked_access().c_str());
 }
 
 auto Node::static_config_suffix() && -> const char* {
     return iox2_config_global_node_static_config_suffix(m_config);
 }
 
-void Node::set_static_config_suffix(const iox::FileName& value) && {
-    iox2_config_global_node_set_static_config_suffix(m_config, value.as_string().c_str());
+void Node::set_static_config_suffix(const iox2::bb::FileName& value) && {
+    iox2_config_global_node_set_static_config_suffix(m_config, value.as_string().unchecked_access().c_str());
 }
 
 auto Node::service_tag_suffix() && -> const char* {
     return iox2_config_global_node_service_tag_suffix(m_config);
 }
 
-void Node::set_service_tag_suffix(const iox::FileName& value) && {
-    iox2_config_global_node_set_service_tag_suffix(m_config, value.as_string().c_str());
+void Node::set_service_tag_suffix(const iox2::bb::FileName& value) && {
+    iox2_config_global_node_set_service_tag_suffix(m_config, value.as_string().unchecked_access().c_str());
 }
 
 auto Node::cleanup_dead_nodes_on_creation() && -> bool {
@@ -595,7 +605,7 @@ void RequestResponse::set_server_max_loaned_responses_per_request(size_t value) 
 }
 
 auto RequestResponse::client_unable_to_deliver_strategy() && -> UnableToDeliverStrategy {
-    return iox::into<UnableToDeliverStrategy>(
+    return iox2::bb::into<UnableToDeliverStrategy>(
         iox2_config_defaults_request_response_client_unable_to_deliver_strategy(m_config));
 }
 
@@ -605,7 +615,7 @@ void RequestResponse::set_client_unable_to_deliver_strategy(UnableToDeliverStrat
 }
 
 auto RequestResponse::server_unable_to_deliver_strategy() && -> UnableToDeliverStrategy {
-    return iox::into<UnableToDeliverStrategy>(
+    return iox2::bb::into<UnableToDeliverStrategy>(
         iox2_config_defaults_request_response_server_unable_to_deliver_strategy(m_config));
 }
 

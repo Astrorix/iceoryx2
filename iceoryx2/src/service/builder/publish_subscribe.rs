@@ -20,10 +20,10 @@ use alloc::format;
 
 use iceoryx2_bb_elementary::alignment::Alignment;
 use iceoryx2_bb_elementary_traits::zero_copy_send::ZeroCopySend;
-use iceoryx2_bb_log::{fail, fatal_panic, warn};
 use iceoryx2_cal::dynamic_storage::DynamicStorageCreateError;
 use iceoryx2_cal::serialize::Serialize;
 use iceoryx2_cal::static_storage::StaticStorageLocked;
+use iceoryx2_log::{fail, fatal_panic, warn};
 
 use crate::service::dynamic_config::publish_subscribe::DynamicConfigSettings;
 use crate::service::header::publish_subscribe::Header;
@@ -243,8 +243,8 @@ impl<
         Self {
             base: self.base.clone(),
             override_alignment: self.override_alignment,
-            override_payload_type: self.override_payload_type.clone(),
-            override_user_header_type: self.override_user_header_type.clone(),
+            override_payload_type: self.override_payload_type,
+            override_user_header_type: self.override_user_header_type,
             verify_number_of_subscribers: self.verify_number_of_subscribers,
             verify_number_of_publishers: self.verify_number_of_publishers,
             verify_subscriber_max_buffer_size: self.verify_subscriber_max_buffer_size,
@@ -521,7 +521,7 @@ impl<
                                 msg, existing_settings.max_nodes, required_settings.max_nodes);
         }
 
-        Ok(existing_settings.clone())
+        Ok(*existing_settings)
     }
 
     fn create_impl(
@@ -688,7 +688,7 @@ impl<
                     };
 
                     self.base.service_config.messaging_pattern =
-                        MessagingPattern::PublishSubscribe(pub_sub_static_config.clone());
+                        MessagingPattern::PublishSubscribe(pub_sub_static_config);
 
                     if let Some(service_tag) = service_tag {
                         service_tag.release_ownership();
@@ -769,7 +769,7 @@ impl<UserHeader: Debug + ZeroCopySend, ServiceType: service::Service>
 {
     #[doc(hidden)]
     pub unsafe fn __internal_set_payload_type_details(mut self, value: &TypeDetail) -> Self {
-        self.override_payload_type = Some(value.clone());
+        self.override_payload_type = Some(*value);
         self
     }
 }
@@ -779,7 +779,7 @@ impl<Payload: Debug + ?Sized + ZeroCopySend, ServiceType: service::Service>
 {
     #[doc(hidden)]
     pub unsafe fn __internal_set_user_header_type_details(mut self, value: &TypeDetail) -> Self {
-        self.override_user_header_type = Some(value.clone());
+        self.override_user_header_type = Some(*value);
         self
     }
 }
@@ -795,11 +795,11 @@ impl<
             MessageTypeDetails::from::<Header, UserHeader, Payload>(TypeVariant::FixedSize);
 
         if let Some(details) = &self.override_payload_type {
-            self.config_details_mut().message_type_details.payload = details.clone();
+            self.config_details_mut().message_type_details.payload = *details;
         }
 
         if let Some(details) = &self.override_user_header_type {
-            self.config_details_mut().message_type_details.user_header = details.clone();
+            self.config_details_mut().message_type_details.user_header = *details;
         }
 
         self.adjust_payload_alignment();
@@ -890,11 +890,11 @@ impl<
             MessageTypeDetails::from::<Header, UserHeader, Payload>(TypeVariant::Dynamic);
 
         if let Some(details) = &self.override_payload_type {
-            self.config_details_mut().message_type_details.payload = details.clone();
+            self.config_details_mut().message_type_details.payload = *details;
         }
 
         if let Some(details) = &self.override_user_header_type {
-            self.config_details_mut().message_type_details.user_header = details.clone();
+            self.config_details_mut().message_type_details.user_header = *details;
         }
 
         self.adjust_payload_alignment();
