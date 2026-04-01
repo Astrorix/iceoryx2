@@ -10,13 +10,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-#![no_std]
-#![no_main]
+#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(not(feature = "std"), no_main)]
 
+extern crate iceoryx2_bb_derive_macros_tests_common;
 extern crate iceoryx2_bb_loggers;
-
-mod placement_default_tests;
-mod zero_copy_send_tests;
 
 use core::{
     alloc::{GlobalAlloc, Layout},
@@ -59,4 +57,4 @@ impl Default for GlobalHeapAllocator {
 #[global_allocator]
 static GLOBAL: GlobalHeapAllocator = GlobalHeapAllocator::new();
 
-iceoryx2_bb_testing_nostd::bootstrap!();
+iceoryx2_bb_testing::test_harness!();

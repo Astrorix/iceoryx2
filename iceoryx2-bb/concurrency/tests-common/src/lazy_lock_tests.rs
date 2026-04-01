@@ -10,6 +10,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+#![allow(clippy::disallowed_types)]
+
 use core::time::Duration;
 
 use alloc::string::String;
@@ -23,13 +25,16 @@ use iceoryx2_bb_posix::barrier::{BarrierBuilder, BarrierHandle, Handle};
 use iceoryx2_bb_posix::clock::nanosleep;
 use iceoryx2_bb_posix::thread::thread_scope;
 use iceoryx2_bb_testing::assert_that;
+use iceoryx2_bb_testing_macros::test;
 
-pub fn lazy_lock_primitive_type() {
+#[test]
+pub fn initialization_of_primitive_type() {
     static VALUE: LazyLock<u32> = LazyLock::new(|| 42);
     assert_eq!(*VALUE, 42);
 }
 
-pub fn lazy_lock_complex_type() {
+#[test]
+pub fn initialization_of_complex_type() {
     #[derive(Debug, PartialEq)]
     struct ComplexType {
         name: String,
@@ -46,7 +51,8 @@ pub fn lazy_lock_complex_type() {
     assert_eq!(COMPLEX.value[2], 3);
 }
 
-pub fn lazy_lock_zero_sized_type() {
+#[test]
+pub fn initialization_of_zero_sized_type() {
     #[derive(Debug, PartialEq)]
     struct ZeroSized;
 
@@ -54,25 +60,29 @@ pub fn lazy_lock_zero_sized_type() {
     assert_eq!(*VALUE, ZeroSized);
 }
 
-pub fn lazy_lock_closure() {
+#[test]
+pub fn closure_is_executed_on_new() {
     let multiplier = 10;
     let lazy = LazyLock::new(move || multiplier * 5);
     assert_eq!(*lazy, 50);
 }
 
-pub fn lazy_lock_non_static() {
+#[test]
+pub fn non_static_usage() {
     let lazy = LazyLock::new(|| vec![1, 2, 3]);
     assert_eq!(lazy.len(), 3);
     assert_eq!(lazy[1], 2);
 }
 
-pub fn lazy_lock_deref() {
+#[test]
+pub fn deref_retrieves_stored_value() {
     static VALUE: LazyLock<String> = LazyLock::new(|| "hello".to_string());
     assert_eq!(VALUE.len(), 5);
     assert_eq!(&*VALUE, "hello");
 }
 
-pub fn lazy_lock_initialization_occurs_once() {
+#[test]
+pub fn initialization_occurs_once() {
     static CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
     static VALUE: LazyLock<u32> = LazyLock::new(|| {
         CALL_COUNT.fetch_add(1, Ordering::SeqCst);
@@ -86,7 +96,8 @@ pub fn lazy_lock_initialization_occurs_once() {
     assert_eq!(CALL_COUNT.load(Ordering::SeqCst), 1);
 }
 
-pub fn lazy_lock_force_initialization() {
+#[test]
+pub fn force_initialization() {
     static CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
     static VALUE: LazyLock<u32> = LazyLock::new(|| {
         CALL_COUNT.fetch_add(1, Ordering::SeqCst);
@@ -103,7 +114,8 @@ pub fn lazy_lock_force_initialization() {
     assert_eq!(CALL_COUNT.load(Ordering::SeqCst), 1);
 }
 
-pub fn lazy_lock_returns_same_reference() {
+#[test]
+pub fn returns_same_reference() {
     static VALUE: LazyLock<String> = LazyLock::new(|| "hello".to_string());
 
     let ref1 = &*VALUE;
@@ -112,7 +124,8 @@ pub fn lazy_lock_returns_same_reference() {
     assert!(core::ptr::eq(ref1, ref2));
 }
 
-pub fn lazy_lock_dependent_initialization() {
+#[test]
+pub fn dependent_initialization() {
     static FIRST: LazyLock<u32> = LazyLock::new(|| 10);
     static SECOND: LazyLock<u32> = LazyLock::new(|| *FIRST * 2);
 
@@ -120,7 +133,8 @@ pub fn lazy_lock_dependent_initialization() {
     assert_eq!(*FIRST, 10);
 }
 
-pub fn lazy_lock_concurrent_access_from_multiple_threads() {
+#[test]
+pub fn concurrent_access_from_multiple_threads() {
     const NUMBER_OF_THREADS: u32 = 10;
     const TIMEOUT: Duration = Duration::from_millis(10);
 

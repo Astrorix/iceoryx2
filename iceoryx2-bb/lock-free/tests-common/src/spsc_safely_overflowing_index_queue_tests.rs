@@ -10,11 +10,20 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use iceoryx2_bb_lock_free::spsc::safely_overflowing_index_queue::*;
-use iceoryx2_bb_testing::assert_that;
-use iceoryx2_bb_testing_nostd_macros::requires_std;
+#![allow(clippy::disallowed_types)]
 
-pub fn spsc_safely_overflowing_index_queue_push_works_until_full() {
+use alloc::vec;
+use alloc::vec::Vec;
+use iceoryx2_bb_posix::mutex::{MutexBuilder, MutexHandle};
+
+use iceoryx2_bb_lock_free::spsc::safely_overflowing_index_queue::*;
+use iceoryx2_bb_posix::barrier::{BarrierBuilder, BarrierHandle, Handle};
+use iceoryx2_bb_posix::thread::thread_scope;
+use iceoryx2_bb_testing::assert_that;
+use iceoryx2_bb_testing_macros::test;
+
+#[test]
+pub fn push_works_until_full() {
     const CAPACITY: usize = 128;
     let sut = FixedSizeSafelyOverflowingIndexQueue::<CAPACITY>::new();
 
@@ -39,7 +48,8 @@ pub fn spsc_safely_overflowing_index_queue_push_works_until_full() {
     assert_that!(sut, is_not_empty);
 }
 
-pub fn spsc_safely_overflowing_index_queue_pop_works_until_empty() {
+#[test]
+pub fn pop_works_until_empty() {
     const CAPACITY: usize = 128;
     let sut = FixedSizeSafelyOverflowingIndexQueue::<CAPACITY>::new();
     let mut sut_producer = sut.acquire_producer().unwrap();
@@ -67,7 +77,8 @@ pub fn spsc_safely_overflowing_index_queue_pop_works_until_empty() {
     assert_that!(sut, is_empty);
 }
 
-pub fn spsc_safely_overflowing_index_queue_push_pop_alteration_works() {
+#[test]
+pub fn push_pop_alteration_works() {
     const CAPACITY: usize = 128;
     let sut = FixedSizeSafelyOverflowingIndexQueue::<CAPACITY>::new();
     let mut sut_producer = sut.acquire_producer().unwrap();
@@ -81,13 +92,15 @@ pub fn spsc_safely_overflowing_index_queue_push_pop_alteration_works() {
     }
 }
 
-pub fn spsc_safely_overflowing_index_queue_get_consumer_twice_fails() {
+#[test]
+pub fn get_consumer_twice_fails() {
     let sut = FixedSizeSafelyOverflowingIndexQueue::<1024>::new();
     let _consumer = sut.acquire_consumer().unwrap();
     assert_that!(sut.acquire_consumer(), is_none);
 }
 
-pub fn spsc_safely_overflowing_index_queue_get_consumer_after_release_succeeds() {
+#[test]
+pub fn get_consumer_after_release_succeeds() {
     let sut = FixedSizeSafelyOverflowingIndexQueue::<1024>::new();
     {
         let _consumer = sut.acquire_consumer();
@@ -95,13 +108,15 @@ pub fn spsc_safely_overflowing_index_queue_get_consumer_after_release_succeeds()
     assert_that!(sut.acquire_consumer(), is_some);
 }
 
-pub fn spsc_safely_overflowing_index_queue_get_producer_twice_fails() {
+#[test]
+pub fn get_producer_twice_fails() {
     let sut = FixedSizeSafelyOverflowingIndexQueue::<1024>::new();
     let _producer = sut.acquire_producer().unwrap();
     assert_that!(sut.acquire_producer(), is_none);
 }
 
-pub fn spsc_safely_overflowing_index_queue_get_producer_after_release_succeeds() {
+#[test]
+pub fn get_producer_after_release_succeeds() {
     let sut = FixedSizeSafelyOverflowingIndexQueue::<1024>::new();
     {
         let _producer = sut.acquire_producer();
@@ -109,12 +124,8 @@ pub fn spsc_safely_overflowing_index_queue_get_producer_after_release_succeeds()
     assert_that!(sut.acquire_producer(), is_some);
 }
 
-#[requires_std("threading", "synchronization")]
-pub fn spsc_safely_overflowing_index_queue_push_pop_works_concurrently() {
-    use iceoryx2_bb_posix::barrier::*;
-    use std::sync::{Arc, Mutex};
-    use std::thread;
-
+#[test]
+pub fn push_pop_works_concurrently() {
     const LIMIT: u64 = 1000000;
     const CAPACITY: usize = 1024;
 
@@ -122,55 +133,66 @@ pub fn spsc_safely_overflowing_index_queue_push_pop_works_concurrently() {
     let mut sut_producer = sut.acquire_producer().unwrap();
     let mut sut_consumer = sut.acquire_consumer().unwrap();
 
-    let producer_storage = Arc::new(Mutex::<Vec<u64>>::new(vec![]));
-    let producer_storage_push = Arc::clone(&producer_storage);
-    let consumer_storage = Arc::new(Mutex::<Vec<u64>>::new(vec![]));
-    let consumer_storage_pop = Arc::clone(&consumer_storage);
-
     let handle = BarrierHandle::new();
     let barrier = BarrierBuilder::new(2)
         .is_interprocess_capable(false)
         .create(&handle)
         .unwrap();
 
-    thread::scope(|s| {
-        s.spawn(|| {
-            let mut guard = producer_storage_push.lock().unwrap();
-            let mut counter: u64 = 0;
+    let pushed_indexes_handle = MutexHandle::<Vec<u64>>::new();
+    let pushed_indexes = MutexBuilder::new()
+        .create(Vec::new(), &pushed_indexes_handle)
+        .expect("Failed to create mutex");
+    let popped_indexes_handle = MutexHandle::<Vec<u64>>::new();
+    let popped_indexes = MutexBuilder::new()
+        .create(Vec::new(), &popped_indexes_handle)
+        .expect("Failed to create mutex");
 
-            barrier.wait();
-            while counter <= LIMIT {
-                if let Some(s) = sut_producer.push(counter) {
-                    guard.push(s);
+    thread_scope(|s| {
+        s.thread_builder()
+            .spawn(|| {
+                let mut counter: u64 = 0;
+                let mut guard = pushed_indexes.lock().expect("failed to acquire mutex");
+
+                barrier.wait();
+                while counter <= LIMIT {
+                    if let Some(idx) = sut_producer.push(counter) {
+                        guard.push(idx);
+                    }
+                    counter += 1;
                 }
-                counter += 1;
-            }
-        });
+            })
+            .expect("failed to spawn thread");
 
-        s.spawn(|| {
-            let mut guard = consumer_storage_pop.lock().unwrap();
+        s.thread_builder()
+            .spawn(|| {
+                let mut guard = popped_indexes.lock().expect("failed to acquire mutex");
 
-            barrier.wait();
-            loop {
-                if let Some(v) = sut_consumer.pop() {
-                    guard.push(v);
-                    if v == LIMIT {
-                        return;
+                barrier.wait();
+                loop {
+                    if let Some(idx) = sut_consumer.pop() {
+                        guard.push(idx);
+                        if idx == LIMIT {
+                            return;
+                        }
                     }
                 }
-            }
-        });
-    });
+            })
+            .expect("failed to spawn thread");
+
+        Ok(())
+    })
+    .expect("failed to run thread scope");
 
     let mut element_counter = vec![0; LIMIT as usize + 1];
 
-    let guard = producer_storage.lock().unwrap();
-    for i in &*guard {
-        element_counter[*i as usize] += 1;
+    let guard = &*pushed_indexes.lock().expect("failed to acquire mutex");
+    for idx in guard {
+        element_counter[*idx as usize] += 1;
     }
-    let guard = consumer_storage.lock().unwrap();
-    for i in &*guard {
-        element_counter[*i as usize] += 1;
+    let guard = &*popped_indexes.lock().expect("failed to acquire mutex");
+    for idx in guard {
+        element_counter[*idx as usize] += 1;
     }
 
     for element in element_counter {
@@ -178,72 +200,80 @@ pub fn spsc_safely_overflowing_index_queue_push_pop_works_concurrently() {
     }
 }
 
-#[requires_std("threading", "synchronization")]
-pub fn spsc_safely_overflowing_index_queue_push_pop_works_concurrently_with_full_queue() {
-    use iceoryx2_bb_posix::barrier::*;
-    use std::sync::{Arc, Mutex};
-    use std::thread;
-
+#[test]
+pub fn push_pop_works_concurrently_with_full_queue() {
     const LIMIT: u64 = 1000000;
     const CAPACITY: usize = 1024;
+    const NUMBER_OF_THREADS: u32 = 2;
 
     let sut = FixedSizeSafelyOverflowingIndexQueue::<CAPACITY>::new();
     let mut sut_producer = sut.acquire_producer().unwrap();
     let mut sut_consumer = sut.acquire_consumer().unwrap();
 
-    let producer_storage = Arc::new(Mutex::<Vec<u64>>::new(vec![]));
-    let producer_storage_push = Arc::clone(&producer_storage);
-    let consumer_storage = Arc::new(Mutex::<Vec<u64>>::new(vec![]));
-    let consumer_storage_pop = Arc::clone(&consumer_storage);
-
     let handle = BarrierHandle::new();
-    let barrier = BarrierBuilder::new(2)
+    let barrier = BarrierBuilder::new(NUMBER_OF_THREADS)
         .is_interprocess_capable(false)
         .create(&handle)
         .unwrap();
+
+    let pushed_indexes_handle = MutexHandle::<Vec<u64>>::new();
+    let pushed_indexes = MutexBuilder::new()
+        .create(Vec::new(), &pushed_indexes_handle)
+        .expect("Failed to create mutex");
+    let popped_indexes_handle = MutexHandle::<Vec<u64>>::new();
+    let popped_indexes = MutexBuilder::new()
+        .create(Vec::new(), &popped_indexes_handle)
+        .expect("Failed to create mutex");
 
     for i in 0..CAPACITY {
         assert_that!(sut_producer.push(i as u64), is_none);
     }
 
-    thread::scope(|s| {
-        s.spawn(|| {
-            let mut guard = producer_storage_push.lock().unwrap();
-            let mut counter: u64 = 1024;
+    thread_scope(|s| {
+        s.thread_builder()
+            .spawn(|| {
+                let mut counter: u64 = 1024;
+                let mut guard = pushed_indexes.lock().expect("failed to acquire mutex");
 
-            barrier.wait();
-            while counter <= LIMIT {
-                if let Some(s) = sut_producer.push(counter) {
-                    guard.push(s);
+                barrier.wait();
+                while counter <= LIMIT {
+                    if let Some(idx) = sut_producer.push(counter) {
+                        guard.push(idx);
+                    }
+                    counter += 1;
                 }
-                counter += 1;
-            }
-        });
+            })
+            .expect("failed to spawn thread");
 
-        s.spawn(|| {
-            let mut guard = consumer_storage_pop.lock().unwrap();
+        s.thread_builder()
+            .spawn(|| {
+                let mut guard = popped_indexes.lock().expect("failed to acquire mutex");
 
-            barrier.wait();
-            loop {
-                if let Some(v) = sut_consumer.pop() {
-                    guard.push(v);
-                    if v == LIMIT {
-                        return;
+                barrier.wait();
+                loop {
+                    if let Some(idx) = sut_consumer.pop() {
+                        guard.push(idx);
+                        if idx == LIMIT {
+                            return;
+                        }
                     }
                 }
-            }
-        });
-    });
+            })
+            .expect("failed to spawn thread");
+
+        Ok(())
+    })
+    .expect("failed to run thread scope");
 
     let mut element_counter = vec![0; LIMIT as usize + 1];
 
-    let guard = producer_storage.lock().unwrap();
-    for i in &*guard {
-        element_counter[*i as usize] += 1;
+    let guard = &*pushed_indexes.lock().expect("failed to acquire mutex");
+    for idx in guard {
+        element_counter[*idx as usize] += 1;
     }
-    let guard = consumer_storage.lock().unwrap();
-    for i in &*guard {
-        element_counter[*i as usize] += 1;
+    let guard = &*popped_indexes.lock().expect("failed to acquire mutex");
+    for idx in guard {
+        element_counter[*idx as usize] += 1;
     }
 
     for element in element_counter {

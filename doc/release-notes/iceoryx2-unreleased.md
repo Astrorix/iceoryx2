@@ -33,6 +33,9 @@
   [#1376](https://github.com/eclipse-iceoryx/iceoryx2/issues/1376)
 * Add `iox2 service hz` command with rolling-rate statistics and timeout support
   [#1383](https://github.com/eclipse-iceoryx/iceoryx2/issues/1383)
+* Release Python GIL (detach thread from python runtime) in blocking functions
+  like `listener.blocking_wait_one()`
+  [#1421](https://github.com/eclipse-iceoryx/iceoryx2/issues/1421)
 
 ### Bugfixes
 
@@ -50,7 +53,7 @@
 * Fix GCC 9 build failure
   [#1342](https://github.com/eclipse-iceoryx/iceoryx2/issues/1342)
 * Bump cryptography from 45.0.7 to 46.0.5 in /iceoryx2-ffi/python
-  [#1316](https://github.com/eclipse-iceoryx/iceoryx2/issues/1348)
+  [#1348](https://github.com/eclipse-iceoryx/iceoryx2/issues/1348)
 * Fix memory order in queue guards and index queue
   [#1356](https://github.com/eclipse-iceoryx/iceoryx2/issues/1356)
 * Bump shellexpand from 3.1.1 to 3.1.2 in Rust and Bazel
@@ -67,6 +70,26 @@
   [#1416](https://github.com/eclipse-iceoryx/iceoryx2/issues/1416)
 * Bump black formatter from 25.1.0 to 26.3.1 in /iceoryx2-ffi/python
   [#1431](https://github.com/eclipse-iceoryx/iceoryx2/issues/1431)
+* Output log entries with single write in console logger
+  [#1432](https://github.com/eclipse-iceoryx/iceoryx2/issues/1432)
+* Bump lz4_flex from 0.11.3 to 0.11.6 in Rust and Bazel
+  [#1444](https://github.com/eclipse-iceoryx/iceoryx2/issues/1444)
+* Fix libc dependency version
+  [#1447](https://github.com/eclipse-iceoryx/iceoryx2/issues/1447)
+* Fix FreeBSD build
+  [#1455](https://github.com/eclipse-iceoryx/iceoryx2/issues/1455)
+* Fix cleanup of resizable data segments
+  [#1463](https://github.com/eclipse-iceoryx/iceoryx2/issues/1463)
+* Bump rustls-webpki from 0.103.8 to 0.103.10 in Rust and Bazel
+  [#1471](https://github.com/eclipse-iceoryx/iceoryx2/issues/1471)
+* Fix deadlock in POSIX barrier in macOS
+  [#1474](https://github.com/eclipse-iceoryx/iceoryx2/issues/1474)
+* Fix `SIGPIPE` in `local::Service` events triggered by the `socketpair`
+  [#1477](https://github.com/eclipse-iceoryx/iceoryx2/issues/1463)
+* Bump requests from 2.32.5 to 2.33.0 in iceoryx2-ffi/python
+  [#1486](https://github.com/eclipse-iceoryx/iceoryx2/issues/1486)
+* Bump cryptography from 46.0.5 to 46.0.6 in /iceoryx2-ffi/python
+  [#1499](https://github.com/eclipse-iceoryx/iceoryx2/issues/1499)
 
 ### Refactoring
 
@@ -74,6 +97,8 @@
     NOTE: Add new entries sorted by issue number to minimize the possibility of
     conflicts when merging.
 -->
+* Remove clippy workaround
+  [#223](https://github.com/eclipse-iceoryx/iceoryx2/issues/223)
 * Remove support for Bazel Workspaces
   [#1263](https://github.com/eclipse-iceoryx/iceoryx2/issues/1263)
 * Adjust test names to naming convention
@@ -97,6 +122,8 @@
   [#1359](https://github.com/eclipse-iceoryx/iceoryx2/issues/1359)
 * Use `libc` constants in linux platform instead of hardcoded values
   [#1388](https://github.com/eclipse-iceoryx/iceoryx2/issues/1388)
+* Rename `ServiceId` into `ServiceHash`
+  [#1508](https://github.com/eclipse-iceoryx/iceoryx2/issues/1508)
 
 ### Workflow
 
@@ -105,10 +132,16 @@
     conflicts when merging.
 -->
 
-* Add framework for `no_std` testing
+* Add custom test framework that supports `no_std` testing
+  [#1300](https://github.com/eclipse-iceoryx/iceoryx2/issues/1300)
+* Add `no_std` tests for `iceoryx2` and crates below it in the architecture
   [#1300](https://github.com/eclipse-iceoryx/iceoryx2/issues/1300)
 * Add CI check for `std` feature propagation
   [#1300](https://github.com/eclipse-iceoryx/iceoryx2/issues/1300)
+* Enable clippy for the whole workspace and all targets
+  [#1355](https://github.com/eclipse-iceoryx/iceoryx2/issues/1355)
+* Add `just` scripts for some common maintenance tasks
+  [#1408](https://github.com/eclipse-iceoryx/iceoryx2/issues/1408)
 
 ### New API features
 
@@ -152,4 +185,32 @@
 
     # new
     cargo build
+    ```
+
+1. `ServiceId` was renamed to `ServiceHash`.
+
+    ```rust
+    // old
+    use iceoryx2::*;
+
+    let node = NodeBuilder::new().create::<ipc::Service>()?;
+
+    let service = node
+        .service_builder(&"My/Funk/ServiceName".try_into()?)
+        .publish_subscribe::<TransmissionData>()
+        .open_or_create()?;
+    service.service_id(); // now service_hash()
+
+    // new
+   use iceoryx2::*;
+
+    let node = NodeBuilder::new().create::<ipc::Service>()?;
+
+    let service = node
+        .service_builder(&"My/Funk/ServiceName".try_into()?)
+        .publish_subscribe::<TransmissionData>()
+        .open_or_create()?;
+    service.service_hash();
+
+    
     ```

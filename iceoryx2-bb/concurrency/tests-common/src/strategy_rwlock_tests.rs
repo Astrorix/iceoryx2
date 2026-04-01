@@ -10,6 +10,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+#![allow(clippy::disallowed_types)]
+
 use core::time::Duration;
 
 use iceoryx2_bb_concurrency::atomic::AtomicU32;
@@ -20,12 +22,14 @@ use iceoryx2_bb_concurrency::{WaitAction, WaitResult};
 use iceoryx2_bb_posix::clock::nanosleep;
 use iceoryx2_bb_posix::thread::thread_scope;
 use iceoryx2_bb_testing::assert_that;
+use iceoryx2_bb_testing_macros::test;
 
 /////////////////////
 //  Reader Preference
 /////////////////////
 
-pub fn strategy_rwlock_reader_preference_try_write_lock_blocks_read_locks() {
+#[test]
+pub fn reader_preference_try_write_lock_blocks_read_locks() {
     let sut = RwLockReaderPreference::new();
 
     assert_that!(sut.try_write_lock(), eq WaitResult::Success);
@@ -36,7 +40,8 @@ pub fn strategy_rwlock_reader_preference_try_write_lock_blocks_read_locks() {
     assert_that!(sut.read_lock(|_, _| WaitAction::Abort), eq WaitResult::Interrupted);
 }
 
-pub fn strategy_rwlock_reader_preference_multiple_read_locks_block_write_lock() {
+#[test]
+pub fn reader_preference_multiple_read_locks_block_write_lock() {
     let sut = RwLockReaderPreference::new();
 
     assert_that!(sut.try_read_lock(), eq WaitResult::Success);
@@ -48,7 +53,8 @@ pub fn strategy_rwlock_reader_preference_multiple_read_locks_block_write_lock() 
     assert_that!(sut.write_lock(|_, _| WaitAction::Abort), eq WaitResult::Interrupted);
 }
 
-pub fn strategy_rwlock_reader_preference_write_lock_and_unlock_works() {
+#[test]
+pub fn reader_preference_write_lock_and_unlock_works() {
     let sut = RwLockReaderPreference::new();
 
     assert_that!(sut.write_lock(|_, _| WaitAction::Abort), eq WaitResult::Success);
@@ -70,7 +76,8 @@ pub fn strategy_rwlock_reader_preference_write_lock_and_unlock_works() {
     assert_that!(sut.write_lock(|_, _| WaitAction::Abort), eq WaitResult::Success);
 }
 
-pub fn strategy_rwlock_reader_preference_try_read_lock_and_unlock_works() {
+#[test]
+pub fn reader_preference_try_read_lock_and_unlock_works() {
     const NUMBER_OF_READ_LOCKS: usize = 123;
     let sut = RwLockReaderPreference::new();
 
@@ -87,7 +94,8 @@ pub fn strategy_rwlock_reader_preference_try_read_lock_and_unlock_works() {
     assert_that!(sut.try_write_lock(), eq WaitResult::Success);
 }
 
-pub fn strategy_rwlock_reader_preference_read_lock_and_unlock_works() {
+#[test]
+pub fn reader_preference_read_lock_and_unlock_works() {
     const NUMBER_OF_READ_LOCKS: usize = 67;
     let sut = RwLockReaderPreference::new();
 
@@ -104,7 +112,8 @@ pub fn strategy_rwlock_reader_preference_read_lock_and_unlock_works() {
     assert_that!(sut.write_lock(|_, _| WaitAction::Abort), eq WaitResult::Success);
 }
 
-pub fn strategy_rwlock_reader_preference_read_lock_blocks_only_write_locks() {
+#[test]
+pub fn reader_preference_read_lock_blocks_only_write_locks() {
     const READ_THREADS: u32 = 4;
     const WRITE_THREADS: u32 = 4;
 
@@ -164,7 +173,8 @@ pub fn strategy_rwlock_reader_preference_read_lock_blocks_only_write_locks() {
     .expect("failed to spawn thread");
 }
 
-pub fn strategy_rwlock_reader_preference_write_lock_blocks_everything() {
+#[test]
+pub fn reader_preference_write_lock_blocks_everything() {
     const TIMEOUT: Duration = Duration::from_millis(25);
 
     const READ_THREADS: u32 = 4;
@@ -236,7 +246,8 @@ pub fn strategy_rwlock_reader_preference_write_lock_blocks_everything() {
 // Writer Preference
 /////////////////////
 
-pub fn strategy_rwlock_writer_preference_try_write_lock_blocks_read_locks() {
+#[test]
+pub fn writer_preference_try_write_lock_blocks_read_locks() {
     let sut = RwLockWriterPreference::new();
 
     assert_that!(sut.try_write_lock(), eq WaitResult::Success);
@@ -247,7 +258,8 @@ pub fn strategy_rwlock_writer_preference_try_write_lock_blocks_read_locks() {
     assert_that!(sut.read_lock(|_, _| WaitAction::Abort), eq WaitResult::Interrupted);
 }
 
-pub fn strategy_rwlock_writer_preference_multiple_read_locks_block_write_lock() {
+#[test]
+pub fn writer_preference_multiple_read_locks_block_write_lock() {
     let sut = RwLockWriterPreference::new();
 
     assert_that!(sut.try_read_lock(), eq WaitResult::Success);
@@ -259,7 +271,8 @@ pub fn strategy_rwlock_writer_preference_multiple_read_locks_block_write_lock() 
     assert_that!(sut.write_lock(|_, _| WaitAction::Abort, |_| {}, |_| {}), eq WaitResult::Interrupted);
 }
 
-pub fn strategy_rwlock_writer_preference_write_lock_and_unlock_works() {
+#[test]
+pub fn writer_preference_write_lock_and_unlock_works() {
     let sut = RwLockWriterPreference::new();
 
     assert_that!(sut.write_lock(|_, _| WaitAction::Abort, |_| {}, |_| {}), eq WaitResult::Success);
@@ -281,7 +294,8 @@ pub fn strategy_rwlock_writer_preference_write_lock_and_unlock_works() {
     assert_that!(sut.write_lock(|_, _| WaitAction::Abort, |_| {}, |_| {}), eq WaitResult::Success);
 }
 
-pub fn strategy_rwlock_writer_preference_try_read_lock_and_unlock_works() {
+#[test]
+pub fn writer_preference_try_read_lock_and_unlock_works() {
     const NUMBER_OF_READ_LOCKS: usize = 123;
     let sut = RwLockWriterPreference::new();
 
@@ -298,7 +312,8 @@ pub fn strategy_rwlock_writer_preference_try_read_lock_and_unlock_works() {
     assert_that!(sut.try_write_lock(), eq WaitResult::Success);
 }
 
-pub fn strategy_rwlock_writer_preference_read_lock_and_unlock_works() {
+#[test]
+pub fn writer_preference_read_lock_and_unlock_works() {
     const NUMBER_OF_READ_LOCKS: usize = 67;
     let sut = RwLockWriterPreference::new();
 
@@ -315,7 +330,8 @@ pub fn strategy_rwlock_writer_preference_read_lock_and_unlock_works() {
     assert_that!(sut.write_lock(|_, _| WaitAction::Abort, |_| {}, |_| {}), eq WaitResult::Success);
 }
 
-pub fn strategy_rwlock_writer_preference_write_lock_blocks_everything() {
+#[test]
+pub fn writer_preference_write_lock_blocks_everything() {
     const READ_THREADS: u32 = 4;
     const WRITE_THREADS: u32 = 4;
 

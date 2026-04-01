@@ -10,6 +10,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+#![allow(clippy::disallowed_types)]
+
 #[cfg(not(feature = "std"))]
 use iceoryx2_bb_concurrency::spin_lock::SpinLock as Mutex;
 #[cfg(feature = "std")]
@@ -17,11 +19,15 @@ use std::sync::Mutex;
 
 use alloc::alloc::{alloc, dealloc, Layout};
 use core::ptr::addr_of;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use iceoryx2_bb_elementary::math::align;
 use iceoryx2_bb_lock_free::spmc::unrestricted_atomic::*;
+use iceoryx2_bb_posix::barrier::{BarrierBuilder, BarrierHandle, Handle};
+use iceoryx2_bb_posix::system_configuration::SystemInfo;
+use iceoryx2_bb_posix::thread::thread_scope;
 use iceoryx2_bb_testing::assert_that;
-use iceoryx2_bb_testing_nostd_macros::requires_std;
+use iceoryx2_bb_testing_macros::test;
 
 const NUMBER_OF_RUNS: usize = 100000;
 const DATA_SIZE: usize = 1024;
@@ -38,7 +44,8 @@ fn verify(value: u8, rhs: &[u8; DATA_SIZE]) -> bool {
     true
 }
 
-pub fn spmc_unrestricted_atomic_acquire_multiple_producer_fails() {
+#[test]
+pub fn acquire_multiple_producer_fails() {
     let _test_lock = TEST_LOCK.lock().unwrap();
     let sut = UnrestrictedAtomic::<[u8; DATA_SIZE]>::new([0xff; DATA_SIZE]);
 
@@ -53,7 +60,8 @@ pub fn spmc_unrestricted_atomic_acquire_multiple_producer_fails() {
     assert_that!(p3, is_some);
 }
 
-pub fn spmc_unrestricted_atomic_load_store_works() {
+#[test]
+pub fn load_store_works() {
     let _test_lock = TEST_LOCK.lock().unwrap();
     let sut = UnrestrictedAtomic::<[u8; DATA_SIZE]>::new([0xff; DATA_SIZE]);
     assert_that!(verify(0xff, &sut.load()), eq true);
@@ -67,12 +75,8 @@ pub fn spmc_unrestricted_atomic_load_store_works() {
     }
 }
 
-#[requires_std("threading", "synchronization")]
-pub fn spmc_unrestricted_atomic_load_store_works_concurrently() {
-    use core::sync::atomic::{AtomicBool, Ordering};
-    use iceoryx2_bb_posix::{barrier::*, system_configuration::SystemInfo};
-    use std::thread;
-
+#[test]
+pub fn load_store_works_concurrently() {
     let _test_lock = TEST_LOCK.lock().unwrap();
     let number_of_threads = SystemInfo::NumberOfCpuCores.value();
     let store_finished = AtomicBool::new(false);
@@ -84,40 +88,46 @@ pub fn spmc_unrestricted_atomic_load_store_works_concurrently() {
 
     let verify_no_data_race = |rhs: &[u8; DATA_SIZE]| -> bool {
         let value = rhs[0];
-        for i in 0..DATA_SIZE {
-            if value != rhs[i] {
+        for other in rhs.iter().take(DATA_SIZE) {
+            if value != *other {
                 return false;
             }
         }
-
         true
     };
 
-    thread::scope(|s| {
+    thread_scope(|s| {
         for _ in 0..number_of_threads {
-            s.spawn(|| {
-                barrier.wait();
-
-                while !store_finished.load(Ordering::Relaxed) {
-                    assert_that!(verify_no_data_race(&sut.load()), eq true);
-                }
-            });
+            s.thread_builder()
+                .spawn(|| {
+                    barrier.wait();
+                    while !store_finished.load(Ordering::Relaxed) {
+                        assert_that!(verify_no_data_race(&sut.load()), eq true);
+                    }
+                })
+                .expect("failed to spawn thread");
         }
 
-        s.spawn(|| {
-            barrier.wait();
-            let producer = sut.acquire_producer().unwrap();
+        s.thread_builder()
+            .spawn(|| {
+                barrier.wait();
+                let producer = sut.acquire_producer().unwrap();
 
-            for i in 0..NUMBER_OF_RUNS {
-                producer.store([(i % 255) as u8; DATA_SIZE]);
-            }
+                for i in 0..NUMBER_OF_RUNS {
+                    producer.store([(i % 255) as u8; DATA_SIZE]);
+                }
 
-            store_finished.store(true, Ordering::Relaxed);
-        });
-    });
+                store_finished.store(true, Ordering::Relaxed);
+            })
+            .expect("failed to spawn thread");
+
+        Ok(())
+    })
+    .expect("failed to run thread scope");
 }
 
-pub fn spmc_unrestricted_atomic_get_ptr_write_and_update_works() {
+#[test]
+pub fn get_ptr_write_and_update_works() {
     let _test_lock = TEST_LOCK.lock().unwrap();
     let sut = UnrestrictedAtomic::<u32>::new(0);
 
@@ -132,51 +142,59 @@ pub fn spmc_unrestricted_atomic_get_ptr_write_and_update_works() {
     assert_that!(sut.load(), eq 1);
 }
 
-#[requires_std("threading", "synchronization")]
-pub fn spmc_unrestricted_atomic_get_ptr_write_and_update_works_concurrently() {
-    use core::sync::atomic::{AtomicBool, Ordering};
-    use iceoryx2_bb_posix::barrier::*;
-    use std::thread;
-
+#[test]
+pub fn get_ptr_write_and_update_works_concurrently() {
     let _test_lock = TEST_LOCK.lock().unwrap();
     let store_finished = AtomicBool::new(false);
     let sut = UnrestrictedAtomic::<u128>::new(0);
     let handle = BarrierHandle::new();
     let barrier = BarrierBuilder::new(2).create(&handle).unwrap();
 
-    let mut values = vec![];
-    thread::scope(|s| {
-        s.spawn(|| {
-            barrier.wait();
+    let out_of_order = AtomicBool::new(false);
+    let number_of_runs_exceeded = AtomicBool::new(false);
 
-            while !store_finished.load(Ordering::Relaxed) {
-                values.push(sut.load());
-            }
-        });
+    thread_scope(|s| {
+        s.thread_builder()
+            .spawn(|| {
+                let mut pred: u128 = 0;
+                barrier.wait();
 
-        s.spawn(|| {
-            let producer = sut.acquire_producer().unwrap();
-            barrier.wait();
+                while !store_finished.load(Ordering::Relaxed) {
+                    let current = sut.load();
+                    if current > NUMBER_OF_RUNS as u128 {
+                        number_of_runs_exceeded.store(true, Ordering::Relaxed);
+                    }
+                    if current < pred {
+                        out_of_order.store(true, Ordering::Relaxed);
+                    }
+                    pred = current;
+                }
+            })
+            .expect("failed to spawn thread");
 
-            for i in 0..NUMBER_OF_RUNS as u128 {
-                let entry = unsafe { producer.__internal_get_ptr_to_write_cell() };
-                unsafe { *entry = i };
-                unsafe { producer.__internal_update_write_cell() };
-            }
+        s.thread_builder()
+            .spawn(|| {
+                let producer = sut.acquire_producer().unwrap();
+                barrier.wait();
+                for i in 0..NUMBER_OF_RUNS as u128 {
+                    let entry = unsafe { producer.__internal_get_ptr_to_write_cell() };
+                    unsafe { *entry = i };
+                    unsafe { producer.__internal_update_write_cell() };
+                }
+                store_finished.store(true, Ordering::Relaxed);
+            })
+            .expect("failed to spawn thread");
 
-            store_finished.store(true, Ordering::Relaxed);
-        });
-    });
+        Ok(())
+    })
+    .expect("failed to run thread scope");
 
-    let mut pred = 0;
-    for v in values {
-        assert_that!(v, le NUMBER_OF_RUNS as u128);
-        assert_that!(v, ge pred);
-        pred = v;
-    }
+    assert_that!(number_of_runs_exceeded.load(Ordering::Relaxed), eq false);
+    assert_that!(out_of_order.load(Ordering::Relaxed), eq false);
 }
 
-pub fn spmc_unrestricted_atomic_get_write_cell_works() {
+#[test]
+pub fn get_write_cell_works() {
     let _test_lock = TEST_LOCK.lock().unwrap();
     let sut = UnrestrictedAtomic::<u32>::new(0);
     let producer = sut.acquire_producer().unwrap();
@@ -197,7 +215,8 @@ pub fn spmc_unrestricted_atomic_get_write_cell_works() {
     }
 }
 
-pub fn spmc_unrestricted_atomic_mgmt_release_producer_allows_new_acquire() {
+#[test]
+pub fn mgmt_release_producer_allows_new_acquire() {
     let _test_lock = TEST_LOCK.lock().unwrap();
     let sut = UnrestrictedAtomicMgmt::new();
 
@@ -213,7 +232,8 @@ pub fn spmc_unrestricted_atomic_mgmt_release_producer_allows_new_acquire() {
     assert_that!(p2, is_ok);
 }
 
-pub fn spmc_unrestricted_atomic_mgmt_get_ptr_write_and_update_works() {
+#[test]
+pub fn mgmt_get_ptr_write_and_update_works() {
     let _test_lock = TEST_LOCK.lock().unwrap();
 
     const INITIAL_VALUE: u64 = 0;
@@ -286,7 +306,8 @@ fn internal_pointer_calculation_works<ValueType: Copy + Default>() {
     }
 }
 
-pub fn spmc_unrestricted_atomic_internal_ptr_calculation_works_with_integers() {
+#[test]
+pub fn internal_ptr_calculation_works_with_integers() {
     internal_pointer_calculation_works::<u8>();
     internal_pointer_calculation_works::<u16>();
     internal_pointer_calculation_works::<u32>();
@@ -352,7 +373,8 @@ fn internal_get_data_cell_calculation_works<ValueType: Copy + Default>() {
     }
 }
 
-pub fn spmc_unrestricted_atomic_internal_get_data_cell_with_integers() {
+#[test]
+pub fn internal_get_data_cell_with_integers() {
     internal_get_data_cell_calculation_works::<u8>();
     internal_get_data_cell_calculation_works::<u16>();
     internal_get_data_cell_calculation_works::<u32>();
@@ -383,7 +405,8 @@ fn mgmt_calculates_correct_size_and_alignment_of_unrestricted_atomic<ValueType: 
     assert_that!(sut_alignment, eq align_of_val(&atomic));
 }
 
-pub fn spmc_unrestricted_atomic_internal_size_and_alignment_calculation_with_integers() {
+#[test]
+pub fn internal_size_and_alignment_calculation_with_integers() {
     mgmt_calculates_correct_size_and_alignment_of_unrestricted_atomic::<u8>();
     mgmt_calculates_correct_size_and_alignment_of_unrestricted_atomic::<u16>();
     mgmt_calculates_correct_size_and_alignment_of_unrestricted_atomic::<u32>();
@@ -398,7 +421,8 @@ pub fn spmc_unrestricted_atomic_internal_size_and_alignment_calculation_with_int
     mgmt_calculates_correct_size_and_alignment_of_unrestricted_atomic::<f64>();
 }
 
-pub fn spmc_unrestricted_atomic_mgmt_get_write_cell_works() {
+#[test]
+pub fn mgmt_get_write_cell_works() {
     let _test_lock = TEST_LOCK.lock().unwrap();
 
     const INITIAL_VALUE: u64 = 0;

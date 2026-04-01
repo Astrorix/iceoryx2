@@ -28,3 +28,33 @@ extern crate alloc;
 pub use iceoryx2_pal_testing::*;
 pub mod instantiate_conformance_tests_macro;
 pub mod lifetime_tracker;
+pub mod test_harness;
+
+pub use inventory;
+#[cfg(feature = "std")]
+pub use libtest_mimic;
+
+/// Default number of test threads for the custom test harness.
+///
+/// Tests using [`iceoryx2_pal_testing::lifetime_tracker::LifetimeTracker`] rely on global mutable state that is not
+/// safe to access concurrently. Serial execution is required unless the caller
+/// explicitly overrides this via `--test-threads`.
+#[cfg(feature = "std")]
+pub const DEFAULT_TEST_THREADS: usize = 1;
+
+pub struct TestCase {
+    pub module: &'static str,
+    pub name: &'static str,
+    pub test_fn: fn(),
+    pub should_ignore: bool,
+    pub should_panic: bool,
+    pub should_panic_message: Option<&'static str>,
+}
+inventory::collect!(TestCase);
+
+pub mod internal {
+    #[cfg(any(target_os = "linux", target_os = "nto"))]
+    pub use iceoryx2_pal_posix::posix::abort;
+    pub use iceoryx2_pal_print::cout;
+    pub use iceoryx2_pal_print::coutln;
+}

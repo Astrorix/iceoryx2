@@ -10,11 +10,15 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use iceoryx2_bb_lock_free::spsc::queue::*;
-use iceoryx2_bb_testing::assert_that;
-use iceoryx2_bb_testing_nostd_macros::requires_std;
+#![allow(clippy::disallowed_types)]
 
-pub fn spsc_queue_push_works_until_full() {
+use iceoryx2_bb_lock_free::spsc::queue::*;
+use iceoryx2_bb_posix::thread::thread_scope;
+use iceoryx2_bb_testing::assert_that;
+use iceoryx2_bb_testing_macros::test;
+
+#[test]
+pub fn push_works_until_full() {
     const CAPACITY: usize = 128;
     let sut = Queue::<i64, CAPACITY>::new();
 
@@ -37,7 +41,8 @@ pub fn spsc_queue_push_works_until_full() {
     assert_that!(sut, is_not_empty);
 }
 
-pub fn spsc_queue_pop_works_until_empty() {
+#[test]
+pub fn pop_works_until_empty() {
     const CAPACITY: usize = 128;
     let sut = Queue::<i64, CAPACITY>::new();
     let mut sut_producer = sut.acquire_producer().unwrap();
@@ -65,7 +70,8 @@ pub fn spsc_queue_pop_works_until_empty() {
     assert_that!(sut, is_empty);
 }
 
-pub fn spsc_queue_push_pop_alteration_works() {
+#[test]
+pub fn push_pop_alteration_works() {
     const CAPACITY: usize = 128;
     let sut = Queue::<i64, CAPACITY>::new();
     let mut sut_producer = sut.acquire_producer().unwrap();
@@ -79,13 +85,15 @@ pub fn spsc_queue_push_pop_alteration_works() {
     }
 }
 
-pub fn spsc_queue_get_consumer_twice_fails() {
+#[test]
+pub fn get_consumer_twice_fails() {
     let sut = Queue::<i64, 1024>::new();
     let _consumer = sut.acquire_consumer().unwrap();
     assert_that!(sut.acquire_consumer(), is_none);
 }
 
-pub fn spsc_queue_get_consumer_after_release_succeeds() {
+#[test]
+pub fn get_consumer_after_release_succeeds() {
     let sut = Queue::<i64, 1024>::new();
     {
         let _consumer = sut.acquire_consumer();
@@ -93,13 +101,15 @@ pub fn spsc_queue_get_consumer_after_release_succeeds() {
     assert_that!(sut.acquire_consumer(), is_some);
 }
 
-pub fn spsc_queue_get_producer_twice_fails() {
+#[test]
+pub fn get_producer_twice_fails() {
     let sut = Queue::<i64, 1024>::new();
     let _producer = sut.acquire_producer().unwrap();
     assert_that!(sut.acquire_producer(), is_none);
 }
 
-pub fn spsc_queue_get_producer_after_release_succeeds() {
+#[test]
+pub fn get_producer_after_release_succeeds() {
     let sut = Queue::<i64, 1024>::new();
     {
         let _producer = sut.acquire_producer();
@@ -107,11 +117,8 @@ pub fn spsc_queue_get_producer_after_release_succeeds() {
     assert_that!(sut.acquire_producer(), is_some);
 }
 
-#[requires_std("threading", "synchronization")]
-pub fn spsc_queue_push_pop_works_concurrently() {
-    use std::sync::{Arc, Mutex};
-    use std::thread;
-
+#[test]
+pub fn push_pop_works_concurrently() {
     const LIMIT: i64 = 10000;
     const CAPACITY: usize = 1024;
 
@@ -119,34 +126,34 @@ pub fn spsc_queue_push_pop_works_concurrently() {
     let mut sut_producer = sut.acquire_producer().unwrap();
     let mut sut_consumer = sut.acquire_consumer().unwrap();
 
-    let storage = Arc::new(Mutex::<Vec<i64>>::new(vec![]));
-    let storage_pop = Arc::clone(&storage);
-
-    thread::scope(|s| {
-        s.spawn(|| {
-            let mut counter: i64 = 0;
-            while counter <= LIMIT {
-                if sut_producer.push(&counter) {
-                    counter += 1;
-                }
-            }
-        });
-
-        s.spawn(|| {
-            let mut guard = storage_pop.lock().unwrap();
-            loop {
-                if let Some(v) = sut_consumer.pop() {
-                    guard.push(v);
-                    if v == LIMIT {
-                        return;
+    thread_scope(|s| {
+        s.thread_builder()
+            .spawn(|| {
+                let mut counter: i64 = 0;
+                while counter <= LIMIT {
+                    if sut_producer.push(&counter) {
+                        counter += 1;
                     }
                 }
-            }
-        });
-    });
+            })
+            .expect("failed to spawn thread");
 
-    let guard = storage.lock().unwrap();
-    for i in 0..LIMIT {
-        assert_that!(guard[i as usize], eq i);
-    }
+        s.thread_builder()
+            .spawn(|| {
+                let mut expected: i64 = 0;
+                loop {
+                    if let Some(value) = sut_consumer.pop() {
+                        assert_that!(value, eq expected);
+                        expected += 1;
+                        if value == LIMIT {
+                            return;
+                        }
+                    }
+                }
+            })
+            .expect("failed to spawn thread");
+
+        Ok(())
+    })
+    .expect("failed to run thread scope");
 }

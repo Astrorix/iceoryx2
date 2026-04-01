@@ -10,14 +10,18 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+#![allow(clippy::disallowed_types)]
+
 use iceoryx2_bb_concurrency::atomic::{AtomicU32, Ordering};
 
 use iceoryx2_bb_concurrency::once::Once;
 use iceoryx2_bb_posix::barrier::{BarrierBuilder, BarrierHandle, Handle};
 use iceoryx2_bb_posix::thread::thread_scope;
 use iceoryx2_bb_testing::assert_that;
+use iceoryx2_bb_testing_macros::test;
 
-pub fn once_executes_exactly_once() {
+#[test]
+pub fn executes_exactly_once() {
     let once = Once::new();
     let counter = AtomicU32::new(0);
 
@@ -37,7 +41,8 @@ pub fn once_executes_exactly_once() {
     assert_that!(once.is_completed(), eq true);
 }
 
-pub fn once_works_with_multiple_threads() {
+#[test]
+pub fn works_with_multiple_threads() {
     const NUMBER_OF_THREADS: u32 = 10;
 
     let once = Once::new();
@@ -69,7 +74,8 @@ pub fn once_works_with_multiple_threads() {
     assert_that!(once.is_completed(), eq true);
 }
 
-pub fn once_is_completed_returns_false_initially() {
+#[test]
+pub fn is_completed_returns_false_initially() {
     let once = Once::new();
     assert_that!(once.is_completed(), eq false);
 }
